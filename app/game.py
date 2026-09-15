@@ -30,9 +30,8 @@ while True:
       time_took = end_time - start_time
       print(f'TIme taken: {time_took}')
       if ans == right_ans[index]:
+         pass
          # calculate score according to time
    # break
 
-
-      
 
