@@ -6,13 +6,13 @@ class Room(Base):
    __tablename__ = 'rooms'
    id = Column(Integer, primary_key=True,autoincrement=True)
    host_id = Column(Integer,nullable=False)
-   room_code = Column(String(255),nullable=False)
-   room_state = Column(String,default='')
+   room_code = Column(String(255),nullable=False,unique=True)
+   room_state = Column(String,default='waiting')
    created_at = Column(DateTime)
-   expires_at = Column(DateTime)
-   current_question_index = Column()
-   current_question_started_at = Column()
    room_started_at = Column()
+   expires_at = Column(DateTime)
+   current_question_started_at = Column()
+   current_question_index = Column(Integer,default=0)
 
 
 
@@ -20,4 +20,6 @@ class Room(Base):
 class Player(Base):
    __tablename__ = 'players'
 
+class RoomPlayer(Base):
+   __tablename__ = 'room_players'
 
