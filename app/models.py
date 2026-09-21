@@ -13,8 +13,7 @@ class Room(Base):
    room_state = Column(String, default='waiting')
    created_at = Column(DateTime, default=datetime.utcnow)
    room_started_at = Column(DateTime)  # null until host clicks start
-   expires_at = Column(DateTime, default=lambda: datetime.utcnow() + timedelta(minutes=10))
-   current_question_started_at = Column(DateTime)
+   expires_at = Column(DateTime, default=lambda: datetime.utcnow() + timedelta(minutes=10)) # link expiry
    current_question_index = Column(Integer, default=0)
 
 
