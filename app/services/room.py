@@ -11,3 +11,12 @@ def create_room():
    c: player copies and shares, the link....
    """
    pass
+
+
+
+def join_room():
+   pass
+
+
+def start_room():
+   pass
