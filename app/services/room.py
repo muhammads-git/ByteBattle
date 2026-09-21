@@ -3,10 +3,16 @@ from app.database import get_db
 from sqlalchemy.orm import Session
 import uuid
 import random
+import string
 
-def generate_unique_room_code():
-   code = uuid.uuid4()
+
+# a 6 lenght room_code e.g XB73H3
+def generate_unique_room_code(lenght = 6):
+   chars_digits = string.ascii_uppercase + string.digits
+   code = random.choices(chars_digits,k=lenght)
    return code
+
+
 def create_room(player_id : str):
    """
    create_room, allows a user/player to create_room..
@@ -20,9 +26,13 @@ def create_room(player_id : str):
    # generate unique code using python uuid
    code = generate_unique_room_code()
 
-   # fetch the questions for the room
-   random_questions = random.sample(range(40),k=3)  # in the range of 40
-   questions = db.query(Question).filter(Question.id == random_questions[0])
+   # count question and fetched random according to the
+   question_count = db.query(Question).count()
+   random_questions = random.sample(range(1, question_count + 1), k=3) 
+   questions = db.query(Question.id).filter(Question.id.in_(random_questions)).all()
+   if not questions:
+      print('No question found.')
+
    # insert into db 
    while True:
       try:

@@ -16,17 +16,6 @@ class Room(Base):
    expires_at = Column(DateTime, default=lambda: datetime.utcnow() + timedelta(minutes=10)) # link expiry
    current_question_index = Column(Integer, default=0)
 
-
-class Player(Base):
-   __tablename__ = 'players'
-   id = Column(Integer,primary_key=True,autoincrement=True)
-   player_name = Column(String(255),nullable=False,unique=True)
-   roll_no = Column(Integer,unique=True,nullable=False)
-   password_hash = Column(String(255),nullable=False)
-
-
-
-
 class RoomPlayer(Base):
    __tablename__ = 'room_players'
    id = Column(Integer,primary_key=True,autoincrement=True)
@@ -35,6 +24,12 @@ class RoomPlayer(Base):
    score = Column(Integer,default=0,nullable=False)
    joined_at = Column(DateTime,default=datetime.utcnow)
 
+class Player(Base):
+   __tablename__ = 'players'
+   id = Column(Integer,primary_key=True,autoincrement=True)
+   player_name = Column(String(255),nullable=False,unique=True)
+   roll_no = Column(Integer,unique=True,nullable=False)
+   password_hash = Column(String(255),nullable=False)
 
 class Question(Base):
    __tablename__ = 'questions'
