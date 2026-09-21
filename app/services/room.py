@@ -39,8 +39,12 @@ def create_room(player_id : str):
          new_room = Room(
             room_code = code,
             host_id = player_id,
-
+            room_quizes=questions # see if the syntax is right as this is: array(int)
          )
+
+         db.add(new_room)
+         db.commit()
+         
       except Exception as e:
          print('Code exists, re-generate.')
          # again call the function
