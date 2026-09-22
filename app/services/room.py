@@ -5,6 +5,7 @@ from sqlalchemy.exc import IntegrityError
 import uuid
 import random
 import string
+from datetime import datetime
 
 
 # a 6 lenght room_code e.g XB73H3
@@ -67,8 +68,38 @@ def create_room(player_id : str):
             raise e
    
 
-def join_room():
-   pass
+def join_room(player_id: int, room_code:str):
+
+   db : Session = get_db()
+
+   # player_id check ignored for now as for dummy code, it will surely be in apps, to ensure the 
+   # player is logged in or not..
+   room = db.query(Room).filter(Room.room_code == room_code).first()
+   if not room:
+      raise ValueError(f"Room doesn't exist.")
+   
+   # check if the player has already join the room no double entry
+   player_exists = db.query(RoomPlayer).filter(RoomPlayer.player_id == player_id,
+                                               RoomPlayer.room_id == room.id).first()
+   if player_exists:
+      raise ValueError(f'Player has already joined the room.')
+   # check if its not started
+   if room.room_state == 'in_progress':
+      raise ValueError(f'Room has already started.')
+   elif room.room_state == 'ended':
+      raise ValueError(f'Room has already ended.')
+   
+   # check expiry
+   if room.expires_at < datetime.utcnow():
+      raise ValueError(f'Room is expired.')
+   
+   # else
+   join = RoomPlayer(
+      player_id = player_id,
+      room_id = room.id
+   )
+   db.add(join)
+   db.commit()
 
 
 def start_room():

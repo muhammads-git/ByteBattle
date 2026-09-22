@@ -10,7 +10,7 @@ class Room(Base):
    host_id = Column(Integer, ForeignKey('players.id'), nullable=False)
    room_code = Column(String(255), nullable=False, unique=True)
    room_quizes = Column(ARRAY(Integer),nullable=False)  # every room has its own assigned 3 quizes..
-   room_state = Column(String, default='waiting')
+   room_state = Column(String, default='waiting')  # waiting -> in_progress -> ended
    created_at = Column(DateTime, default=datetime.utcnow)
    room_started_at = Column(DateTime)  # null until host clicks start
    expires_at = Column(DateTime, default=lambda: datetime.utcnow() + timedelta(minutes=10)) # link expiry
