@@ -100,7 +100,27 @@ def join_room(player_id: int, room_code:str):
    )
    db.add(join)
    db.commit()
+ 
+
+def start_room(host_id:int, room_code:str):
+   """ to start a room: one must be host..."""
+   db : Session = get_db()
+
+   # check if room exist or not you are starting...
+   room_exists = db.query(Room).filter(Room.room_code == room_code).first()
+   if not room_exists:
+      raise ValueError(f'Room does not exists.')
+   # check room expiry
+   if room_exists.expires_at < datetime.utcnow():
+      raise ValueError(f'Room is expired.')
+   # check the host
+   host = db.query(Room).filter(Room.host_id == host_id).first()
+   if not host:
+      raise ValueError(f'Unauthorized action.')
+   # chagne room status 
+   room_exists.room_state = 'in_progress'
+   
+   
 
 
-def start_room():
    pass
