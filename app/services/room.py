@@ -111,7 +111,7 @@ def start_room(host_id:int, room_code:str):
    if not room_exists:
       raise ValueError(f'Room does not exists.')
    # check the host
-   host = db.query(Room).filter(Room.host_id == host_id).first()
+   host = db.query(Room).filter(Room.host_id == room_exists.host_id).first()
    if not host:
       raise ValueError(f'Unauthorized action.')
    # check room already started or ended
@@ -123,14 +123,20 @@ def start_room(host_id:int, room_code:str):
    if room_exists.expires_at < datetime.utcnow():
       raise ValueError(f'Room is expired.')
 
-   # start the room 
-   # current_question time start...
-
-
-   #  room status 
+   
+   """ 
+   start the room 
+   start the current question timer
+   change the room state to in_progress
+   """
+   
+   now = datetime.utcnow()
+   room_exists.room_started_at = now   
+   room_exists.current_question_started_at = now
    room_exists.room_state = 'in_progress'
-   
+
+   db.commit()
    
 
 
-   pass
+   

@@ -15,7 +15,8 @@ class Room(Base):
    room_started_at = Column(DateTime)  # null until host clicks start
    expires_at = Column(DateTime, default=lambda: datetime.utcnow() + timedelta(minutes=10)) # link expiry
    current_question_index = Column(Integer, default=0)
-
+   current_question_started_at = Column(DateTime) # null until room starts
+   
 class RoomPlayer(Base):
    __tablename__ = 'room_players'
    id = Column(Integer,primary_key=True,autoincrement=True)
