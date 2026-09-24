@@ -12,7 +12,10 @@ from datetime import datetime
 def generate_unique_room_code(lenght = 6):
    chars_digits = string.ascii_uppercase + string.digits
    code = random.choices(chars_digits,k=lenght)
-   return code
+   # turn the list into string
+   str_code = ''.join(code)
+   print(f'Code : {str_code}')
+   return str_code
 
 
 def create_room(player_id : str):
@@ -24,7 +27,7 @@ def create_room(player_id : str):
    c: player copies and shares, the link....
 
    """
-   db : Session = get_db()
+   db = next(get_db())
    # generate unique code using python uuid
    code = generate_unique_room_code()
 
@@ -70,7 +73,8 @@ def create_room(player_id : str):
 
 def join_room(player_id: int, room_code:str):
 
-   db : Session = get_db()
+   # db : Session = get_db()
+   db = next(get_db())
 
    # player_id check ignored for now as for dummy code, it will surely be in apps, to ensure the 
    # player is logged in or not..
@@ -104,16 +108,16 @@ def join_room(player_id: int, room_code:str):
 
 def start_room(host_id:int, room_code:str):
    """ to start a room: one must be host..."""
-   db : Session = get_db()
+   # db : Session = get_db()
+   db = next(get_db())
 
    # check if room exist or not you are starting...
    room_exists = db.query(Room).filter(Room.room_code == room_code).first()
    if not room_exists:
       raise ValueError(f'Room does not exists.')
-   # check the host
-   host = db.query(Room).filter(Room.host_id == room_exists.host_id).first()
-   if not host:
-      raise ValueError(f'Unauthorized action.')
+   # check the host 
+   if room_exists.host_id != host_id:
+    raise ValueError('Unauthorized action.')
    # check room already started or ended
    if room_exists.room_state =='in_progress':
       raise ValueError(f'Room already started.')
@@ -139,4 +143,4 @@ def start_room(host_id:int, room_code:str):
    
 
 
-   
+   return 'Room started.....'
