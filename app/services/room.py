@@ -6,7 +6,10 @@ import uuid
 import random
 import string
 from datetime import datetime
+from fastapi import APIRouter
 
+# instantiate the room
+room_router = APIRouter()
 
 # a 6 lenght room_code e.g XB73H3
 def generate_unique_room_code(lenght = 6):
@@ -18,6 +21,7 @@ def generate_unique_room_code(lenght = 6):
    return str_code
 
 
+@room_router.post('/rooms')
 def create_room(player_id : str):
    """
    create_room, allows a user/player to create_room..
@@ -70,7 +74,7 @@ def create_room(player_id : str):
          else:
             raise e
    
-
+@room_router.post('/rooms/{room_code}/players')
 def join_room(player_id: int, room_code:str):
 
    # db : Session = get_db()
@@ -106,6 +110,7 @@ def join_room(player_id: int, room_code:str):
    db.commit()
  
 
+@room_router.post('/rooms/{room_code}/start')
 def start_room(host_id:int, room_code:str):
    """ to start a room: one must be host..."""
    # db : Session = get_db()
