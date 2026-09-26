@@ -7,10 +7,10 @@ import string
 from datetime import datetime,timezone
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
-from fastapi.templating import Jinja2Templates
+from app.templates_configs import templates
 
 room_router = APIRouter()
-templates = Jinja2Templates(directory="app/templates")
+
 
 
 def generate_unique_room_code(length=6):
