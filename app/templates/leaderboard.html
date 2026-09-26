@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Leaderboard — ByteBattle{% endblock %}
+{% block main_class %}center-col{% endblock %}
+
+{% block content %}
+  <div class="eyebrow-plain">Room {{ room_code }}</div>
+  <h1>Leaderboard</h1>
+
+  {% if top_three|length > 0 %}
+  <div class="podium">
+    {% if top_three|length > 1 %}
+    <div class="podium-slot second">
+      <div class="avatar-ring">{{ top_three[1].name[0]|upper }}</div>
+      <div class="p-name">{{ top_three[1].name }}</div>
+      <div class="p-score">{{ top_three[1].score }} pts</div>
+      <div class="stand">2</div>
+    </div>
+    {% endif %}
+
+    <div class="podium-slot first">
+      <div class="avatar-ring">{{ top_three[0].name[0]|upper }}</div>
+      <div class="p-name">{{ top_three[0].name }}</div>
+      <div class="p-score">{{ top_three[0].score }} pts</div>
+      <div class="stand">1</div>
+    </div>
+
+    {% if top_three|length > 2 %}
+    <div class="podium-slot third">
+      <div class="avatar-ring">{{ top_three[2].name[0]|upper }}</div>
+      <div class="p-name">{{ top_three[2].name }}</div>
+      <div class="p-score">{{ top_three[2].score }} pts</div>
+      <div class="stand">3</div>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="panel" style="width: 100%; max-width: 480px; text-align: left;">
+    <ul class="rank-list">
+      {% for player in rest %}
+      <li class="rank-row {% if player.is_you %}you{% endif %}">
+        <span class="rank-num">{{ loop.index + 3 }}</span>
+        <span class="rank-name">{{ player.name }}{% if player.is_you %} (you){% endif %}</span>
+        <span class="rank-score">{{ player.score }} pts</span>
+      </li>
+      {% else %}
+      <li style="color: var(--chalk-dim); padding: 0.85rem 0.3rem;">That's everyone.</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="result-actions">
+    <a href="/rooms/new" class="btn btn-primary">Start a new room</a>
+  </div>
+{% endblock %}

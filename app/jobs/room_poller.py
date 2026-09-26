@@ -1,7 +1,6 @@
 from app.database import get_db
 from app.models import *
-from datetime import datetime
-
+from datetime import datetime,timezone
 
 def advance_rooms_questions():
    db = next(get_db())
@@ -16,7 +15,7 @@ def advance_rooms_questions():
       # current_question_started_time = room.current_question_started_at
       # calculate the time if >< to 15
       # act accordinlgly   
-      time = datetime.utcnow() - room.current_question_started_at
+      time = datetime.now(timezone.utc) - room.current_question_started_at
       if time.total_seconds() >= 15:
          # check if the question is last or last index
          total_question_index = len(room.room_quizes) - 1

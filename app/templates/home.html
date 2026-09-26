@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}ByteBattle — guess the output, beat your class{% endblock %}
+{% block main_class %}center-col{% endblock %}
+
+{% block content %}
+  <h1>What does this code print?</h1>
+  <p>A live quiz for your class. One code snippet, four guesses, whoever's fastest wins the round.</p>
+
+  <div class="hero-cta-row">
+    <a href="/rooms" class="btn btn-primary btn-lg">Create a room</a>
+    <button type="button" class="btn btn-outline btn-lg" onclick="document.getElementById('join-panel').scrollIntoView({behavior:'smooth'})">
+      Join with a code
+    </button>
+  </div>
+
+  <div class="panel" id="join-panel" style="margin-top: 2.5rem; max-width: 380px; width: 100%;">
+    <h3 style="text-align:left; margin-bottom: 1rem;">Got a room code?</h3>
+    <form method="post" action="/rooms/{{room_code}}/players">
+      <div class="field">
+        <label for="room_code">Room code</label>
+        <input type="text" id="room_code" name="room_code" placeholder="XB73H3" maxlength="6" autocomplete="off" style="text-align:center; text-transform:uppercase;">
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Join room</button>
+    </form>
+  </div>
+
+  <div class="how-it-works">
+    <div class="step">
+      <div class="tag">01</div>
+      <h3>Create or join</h3>
+      <p>One person starts a room and shares the link. Everyone else just taps it.</p>
+    </div>
+    <div class="step">
+      <div class="tag">02</div>
+      <h3>Guess the output</h3>
+      <p>A Python snippet shows up. Pick what it prints before the clock runs out.</p>
+    </div>
+    <div class="step">
+      <div class="tag">03</div>
+      <h3>Climb the board</h3>
+      <p>Faster + correct scores higher. See who actually knows their Python.</p>
+    </div>
+  </div>
+
+  <p class="footer-note">Built by a student, for the students.</p>
+{% endblock %}

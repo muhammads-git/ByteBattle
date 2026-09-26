@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Game over — ByteBattle{% endblock %}
+{% block main_class %}center-col{% endblock %}
+
+{% block content %}
+  <div class="eyebrow-plain">Round complete</div>
+  <div class="score-display">{{ final_score }}</div>
+  <div class="score-label">points &middot; ranked #{{ rank }} of {{ total_players }}</div>
+
+  <p style="margin-top: 1.5rem;">
+    {% if rank == 1 %}
+      Top of the class this round.
+    {% elif rank <= 3 %}
+      Podium finish — nicely done.
+    {% else %}
+      Faster next time. The code doesn't lie.
+    {% endif %}
+  </p>
+
+  <div class="result-actions">
+    <a href="/rooms" class="btn btn-outline">Back to lobby</a>
+    <a href="/rooms/{{ room_code }}/leaderboard" class="btn btn-primary">View leaderboard</a>
+  </div>
+{% endblock %}

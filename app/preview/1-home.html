@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ByteBattle</title>
+<link rel="stylesheet" href="static/style.css">
+</head>
+<body>
+<div class="shell">
+  <header class="topbar"><a href="1-home.html" class="brand">Byte<span>Battle</span></a></header>
+  <main class="main center-col">
+    <h1>What does this code print?</h1>
+    <p>A live quiz for your class. One code snippet, four guesses, whoever's fastest wins the round.</p>
+    <div class="hero-cta-row">
+      <a href="2-lobby.html" class="btn btn-primary btn-lg">Create a room</a>
+      <button type="button" class="btn btn-outline btn-lg" onclick="document.getElementById('join-panel').scrollIntoView({behavior:'smooth'})">Join with a code</button>
+    </div>
+    <div class="panel" id="join-panel" style="margin-top:2.5rem;max-width:380px;width:100%;">
+      <h3 style="text-align:left;margin-bottom:1rem;">Got a room code?</h3>
+      <div class="field"><label>Room code</label><input type="text" placeholder="XB73H3" style="text-align:center;text-transform:uppercase;"></div>
+      <a href="3-arena.html" class="btn btn-primary btn-block">Join room</a>
+    </div>
+    <div class="how-it-works">
+      <div class="step"><div class="tag">01</div><h3>Create or join</h3><p>One person starts a room and shares the link. Everyone else just taps it.</p></div>
+      <div class="step"><div class="tag">02</div><h3>Guess the output</h3><p>A Python snippet shows up. Pick what it prints before the clock runs out.</p></div>
+      <div class="step"><div class="tag">03</div><h3>Climb the board</h3><p>Faster + correct scores higher. See who actually knows their Python.</p></div>
+    </div>
+    <p class="footer-note">Built by students, for students.</p>
+  </main>
+</div>
+</body>
+</html>

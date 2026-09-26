@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Room {{ room_code }} — ByteBattle{% endblock %}
+{% block main_class %}center-col{% endblock %}
+
+{% block content %}
+  <div class="eyebrow-plain">Waiting room</div>
+  <h1>Get your class in</h1>
+  <p>Share the code below. Everyone who joins shows up here in real time.</p>
+
+  <div class="room-code-box">
+    <span class="code">{{ room_code }}</span>
+    <button type="button" class="btn btn-outline" onclick="navigator.clipboard.writeText(window.location.origin + '/rooms/{{ room_code }}')">
+      Copy link
+    </button>
+  </div>
+
+  <div class="panel" style="width: 100%; max-width: 480px; text-align: left;">
+    <h3 style="display:flex; align-items:center; justify-content:space-between;">
+      Players
+      <span class="mono" style="font-size:0.9rem; color: var(--chalk-dim); font-weight: 500;">{{ players|length }} joined</span>
+    </h3>
+    <ul class="player-list">
+      {% for player in players %}
+      <li>
+        <span class="player-dot"></span>
+        {{ player.name }}
+        {% if player.is_host %}<span class="you-tag">HOST</span>{% endif %}
+      </li>
+      {% else %}
+      <li style="color: var(--chalk-dim); border: none;">Nobody's joined yet — share the code above.</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  {% if is_host %}
+  <form method="post" action="/rooms/{{ room_code }}/start" style="margin-top: 2rem; width: 100%; max-width: 480px;">
+    <button type="submit" class="btn btn-primary btn-lg btn-block" {% if players|length < 1 %}disabled{% endif %}>
+      Start the game
+    </button>
+  </form>
+  {% else %}
+  <div class="waiting-line" style="margin-top: 2rem;">
+    <span class="pulse-dot"></span>
+    Waiting for the host to start&hellip;
+  </div>
+  {% endif %}
+{% endblock %}
