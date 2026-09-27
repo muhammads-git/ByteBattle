@@ -1,0 +1,164 @@
+/* ==========================================================================
+   ByteBattle — auth pages (signup / login)
+   Extends style.css — load style.css first.
+   ========================================================================== */
+
+.auth-shell {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.25rem;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ambient drifting code glyphs — the one "life" layer, quiet and slow */
+.glyph-field {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+.glyph {
+  position: absolute;
+  font-family: var(--font-mono);
+  color: var(--slate-line);
+  opacity: 0.35;
+  animation: drift linear infinite;
+}
+@keyframes drift {
+  from { transform: translateY(0) rotate(0deg); }
+  to   { transform: translateY(-40px) rotate(6deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .glyph { animation: none; }
+}
+
+.auth-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 420px;
+}
+
+.auth-brand {
+  text-align: center;
+  margin-bottom: 1.75rem;
+}
+.auth-brand .brand-link {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.4rem;
+  color: var(--chalk);
+}
+.auth-brand .brand-link span { color: var(--marker); }
+
+/* typed-in headline — the single orchestrated motion moment */
+.type-headline {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  color: var(--chalk-dim);
+  text-align: center;
+  margin-bottom: 1.5rem;
+  min-height: 1.4em;
+}
+.type-headline::after {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 1em;
+  background: var(--marker);
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: blink 1s step-end infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .type-headline::after { animation: none; }
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.auth-panel {
+  background: var(--slate);
+  border: 2px solid var(--slate-line);
+  border-radius: var(--radius-soft);
+  padding: 2rem 1.75rem;
+}
+
+.auth-panel h1 {
+  font-size: 1.6rem;
+  text-align: center;
+  margin-bottom: 0.3rem;
+  position: relative;
+  display: inline-block;
+}
+
+.auth-heading-wrap {
+  text-align: center;
+  margin-bottom: 1.6rem;
+}
+
+/* hand-drawn underline swoosh — academic, chalk-on-board feel */
+.chalk-underline {
+  display: block;
+  width: 84px;
+  height: 10px;
+  margin: 0.35rem auto 0;
+}
+
+.auth-subtext {
+  text-align: center;
+  color: var(--chalk-dim);
+  font-size: 0.92rem;
+  margin: 0 0 1.6rem;
+}
+
+/* roll number field styled like an attendance ledger entry */
+.field-rollno label::before {
+  content: 'ROLL NO.';
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  color: var(--marker-dim);
+  display: none; /* label text already covers this; kept for potential ledger variant */
+}
+.field-rollno input {
+  font-size: 1.2rem;
+  letter-spacing: 0.08em;
+}
+
+.auth-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  background: rgba(255, 107, 87, 0.1);
+  border: 1px solid var(--coral);
+  border-radius: 10px;
+  padding: 0.8rem 1rem;
+  margin-bottom: 1.3rem;
+  color: var(--coral);
+  font-size: 0.9rem;
+}
+.auth-error .mark {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.auth-switch {
+  text-align: center;
+  margin-top: 1.5rem;
+  color: var(--chalk-dim);
+  font-size: 0.92rem;
+}
+
+.field-hint {
+  font-size: 0.78rem;
+  color: var(--chalk-dim);
+  margin-top: 0.35rem;
+  opacity: 0.8;
+}

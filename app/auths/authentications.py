@@ -1,15 +1,17 @@
 from fastapi import APIRouter,Depends,Form,Request
+from fastapi.responses import RedirectResponse
 from typing import Annotated
 from app.models import *
 from app.database import get_db
 from sqlalchemy.orm import Session
 from app.services.room import templates
+from app.security import PasswordManager
 
 auths_router = APIRouter()
 
 
-@auths_router.post('/login')
-def login(request:Request,
+@auths_router.post('/register')
+def register(request:Request,
     db: Session = Depends(get_db),
     username: Annotated[
         str, 
@@ -36,12 +38,66 @@ def login(request:Request,
             'request':request,
             'error':'This Roll No is not registered in Unviersity.'
         })
-    if not registered.is_registered:
+    if registered.is_registered:
         return templates.TemplateResponse(request, 'signup.html',{
             'request': request,
             'error':'An account is already linked to this Roll No.'
         })
 
     # hash the password
+    hash_password = PasswordManager.hash_Pass(password)
     # insert data into Players and is_registered == True
-    
+    new_player = Player(
+        player_name = username,
+        roll_no = roll_no,
+        password_hash = hash_password # hashed_password
+
+    )
+    db.add(new_player)
+
+    # Student_registry  -> True
+    registered.is_registered = True
+    # atomic commit
+    db.commit()
+
+    # redirect to login until session management isnt implemented
+    return RedirectResponse(url=f"/login", status_code=303)
+
+@auths_router.post('/login')
+def login(request:Request,
+    db: Session = Depends(get_db),
+    roll_no: Annotated[str, Form(...)] = None,
+    password: Annotated[str, Form(...)] = None
+):
+
+    player = db.query(Player).filter(Player.roll_no == roll_no).first()
+    if not player:
+        return templates.TemplateResponse(request,'signup.html',{
+            'request':request,
+            'error':'Player not found.'
+        })
+    # check passs
+    if not PasswordManager.verifyPassword(password,player.password_hash):
+        return templates.TemplateResponse(request,'signup.html',{
+            'request':request,
+            'error':'Invalid Password.'
+        })
+
+    # logged in
+    return RedirectResponse(url=f"/home", status_code=303)
+
+
+
+    # GET
+@auths_router.get('/register-page')
+def register_page(request: Request):
+    return templates.TemplateResponse(request, 'signup.html', {
+        'request': request
+    })
+
+
+@auths_router.get('/login-page')
+def login_page(request: Request):
+    return templates.TemplateResponse(request, 'login.html', {
+        'request': request
+    })

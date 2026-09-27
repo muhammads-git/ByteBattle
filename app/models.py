@@ -11,7 +11,7 @@ class StudentRegistry(Base):
     
     # Using roll_no as the primary key since it is unique per student
     roll_no = Column(String(50), primary_key=True)
-    is_registered = Column(Boolean, default=False, nullable=False)
+    is_registered = Column(Boolean, default=False)
 
 class Room(Base):
    __tablename__ = 'rooms'
@@ -41,7 +41,7 @@ class Player(Base):
    __tablename__ = 'players'
    id = Column(Integer, primary_key=True, autoincrement=True)
    player_name = Column(String(255), nullable=False, unique=True)
-   roll_no = Column(String(50), unique=True, nullable=False)
+   roll_no = Column(String(50), ForeignKey('student_registry.roll_no'),unique=True, nullable=False)
    password_hash = Column(String(255), nullable=False)
 
 class Question(Base):

@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Register — ByteBattle</title>
-  <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', path='auth.css') }}">
+  <title>Log in — ByteBattle</title>
+  <link rel="stylesheet" href="static/style.css">
+  <link rel="stylesheet" href="static/auth.css">
 </head>
 <body>
   <div class="auth-shell">
@@ -13,57 +13,44 @@
 
     <div class="auth-card">
       <div class="auth-brand">
-        <a href="/home" class="brand-link">Byte<span>Battle</span></a>
+        <a href="1-home.html" class="brand-link">Byte<span>Battle</span></a>
       </div>
 
       <div class="type-headline" id="type-headline"></div>
 
       <div class="auth-panel">
         <div class="auth-heading-wrap">
-          <h1>Join the roster</h1>
+          <h1>Welcome back</h1>
           <svg class="chalk-underline" viewBox="0 0 84 10" aria-hidden="true">
             <path d="M2 6 C 20 2, 40 9, 62 4 S 80 3, 82 5" stroke="var(--marker)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
           </svg>
         </div>
-        <p class="auth-subtext">Only enrolled roll numbers can register.</p>
+        <p class="auth-subtext">Log in with your roll number.</p>
 
-        {% if error %}
-        <div class="auth-error">
-          <span class="mark">!</span>
-          <span>{{ error }}</span>
-        </div>
-        {% endif %}
 
-        <form method="post" action="/auth/register">
+        <form method="post" action="#">
           <div class="field field-rollno">
             <label for="roll_no">Roll number</label>
-            <input type="text" id="roll_no" name="roll_no" placeholder="302-231025" autocomplete="off" required>
-          </div>
-
-          <div class="field">
-            <label for="username">Display name</label>
-            <input type="text" id="username" name="username" placeholder="What shows on the leaderboard" autocomplete="off" required minlength="3" maxlength="20">
-            <div class="field-hint">Letters, numbers and underscores only.</div>
+            <input type="text" id="roll_no" name="roll_no" placeholder="FA21-BCS-045" autocomplete="off" required>
           </div>
 
           <div class="field">
             <label for="password">Password</label>
-            <input type="password" id="password" name="password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" autocomplete="new-password" required minlength="8">
+            <input type="password" id="password" name="password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" autocomplete="current-password" required>
           </div>
 
-          <button type="submit" class="btn btn-primary btn-block btn-lg">Create account</button>
+          <button type="submit" class="btn btn-primary btn-block btn-lg">Log in</button>
         </form>
       </div>
 
-      <p class="auth-switch">Already registered? <a href="/auth/login-page">Log in</a></p>
+      <p class="auth-switch">New here? <a href="6-signup.html">Create an account</a></p>
     </div>
   </div>
 
   <script>
-    // one orchestrated entrance moment: type the tagline, then blink
     (function () {
       const el = document.getElementById('type-headline');
-      const text = 'guess the output. beat your class.';
+      const text = 'pick up right where you left off.';
       const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       if (reduceMotion) { el.textContent = text; return; }
       let i = 0;
@@ -75,7 +62,6 @@
       type();
     })();
 
-    // ambient glyph field — a handful of faint drifting code symbols, not confetti
     (function () {
       const field = document.getElementById('glyph-field');
       if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;

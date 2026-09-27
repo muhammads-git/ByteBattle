@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Register — ByteBattle</title>
-  <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', path='auth.css') }}">
+  <link rel="stylesheet" href="static/style.css">
+  <link rel="stylesheet" href="static/auth.css">
 </head>
 <body>
   <div class="auth-shell">
@@ -13,7 +13,7 @@
 
     <div class="auth-card">
       <div class="auth-brand">
-        <a href="/home" class="brand-link">Byte<span>Battle</span></a>
+        <a href="1-home.html" class="brand-link">Byte<span>Battle</span></a>
       </div>
 
       <div class="type-headline" id="type-headline"></div>
@@ -27,17 +27,11 @@
         </div>
         <p class="auth-subtext">Only enrolled roll numbers can register.</p>
 
-        {% if error %}
-        <div class="auth-error">
-          <span class="mark">!</span>
-          <span>{{ error }}</span>
-        </div>
-        {% endif %}
 
-        <form method="post" action="/auth/register">
+        <form method="post" action="#">
           <div class="field field-rollno">
             <label for="roll_no">Roll number</label>
-            <input type="text" id="roll_no" name="roll_no" placeholder="302-231025" autocomplete="off" required>
+            <input type="text" id="roll_no" name="roll_no" placeholder="FA21-BCS-045" autocomplete="off" required>
           </div>
 
           <div class="field">
@@ -55,7 +49,7 @@
         </form>
       </div>
 
-      <p class="auth-switch">Already registered? <a href="/auth/login-page">Log in</a></p>
+      <p class="auth-switch">Already registered? <a href="7-login.html">Log in</a></p>
     </div>
   </div>
 
