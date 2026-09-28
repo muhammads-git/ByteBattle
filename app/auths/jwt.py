@@ -2,8 +2,10 @@ import jwt
 from dotenv import load_dotenv
 import os
 from datetime import datetime, timezone,timedelta
-
-
+from fastapi.security import OAuth2PasswordBearer
+from fastapi import Depends,HTTPException
+from sqlalchemy.orm import Session
+from app.database import get_db
 
 load_dotenv()
 
@@ -42,13 +44,26 @@ def decodeAccessToken(token : str):
 
    if not username:
       # raise Exception
-      pass
+      raise HTTPException(status_code=401, detail="Invalid token payload")
 
    return payload
 
 
-
-# get current user
-def getCurrentUser():
+# refresh token
+def getRefreshToken(token : str):
    pass
 
+
+# get current user
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl='/login')
+# FastAPI automatically extracts the token string from the headers and gives it to 'token'
+def get_current_user(token: str = Depends(oauth2_scheme)):
+    try:
+        # Now you decode the token that the client provided
+        payload = decodeAccessToken(token)
+        username: str = payload.get("sub")
+        if username is None:
+            raise HTTPException(status_code=401, detail="Invalid token payload")
+        return username
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Could not validate credentials")
