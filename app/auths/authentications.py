@@ -1,4 +1,4 @@
-from fastapi import APIRouter,Depends,Form,Request
+from fastapi import APIRouter,Depends,Form,Request,Response,HTTPException
 from fastapi.responses import RedirectResponse
 from typing import Annotated
 from app.models import *
@@ -138,7 +138,7 @@ def login_page(request: Request):
 
 ##### refresh tokennnn..  request
 @auths_router.post('/refresh')
-def get_refresh_token(db:Session=Depends(get_db),current_user=Depends(get_current_user)):
+def get_refresh_token(request:Request,response:Response,db:Session=Depends(get_db)):
     """
     fetch the refresh token from httpOnly and db where user is this.
     match both
@@ -151,5 +151,15 @@ def get_refresh_token(db:Session=Depends(get_db),current_user=Depends(get_curren
                 access
     return both to where they need to be, for the same rotations.. and valdiations...
     """
+    #fetrch the refresh token from httpOnly
+    http_only_refresh_token = request.cookies.get('refresh_token')
+    if not http_only_refresh_token:
+        # raise HTTPException(status_code='',message='Refresh Token has expired, please login again.')
+        pass
+
+    # fetch the refresh token from db 
+    db_refresh_token = db.query(RefreskToken).filter(RefreskToken.token == http_only_refresh_token).first()
+    if not db_refresh_token:
+        # raise HTTPException(status_code='',message='')
 
     pass
