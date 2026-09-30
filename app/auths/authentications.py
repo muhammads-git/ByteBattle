@@ -6,6 +6,7 @@ from app.database import get_db
 from sqlalchemy.orm import Session
 from app.services.room import templates
 from app.security import PasswordManager
+from app.auths.jwt import createAccessToken,getRefreshToken
 
 auths_router = APIRouter()
 
@@ -83,6 +84,10 @@ def login(request:Request,
             'error':'Invalid Password.'
         })
 
+    # login success
+    # create/return  jwt token
+    token = createAccessToken({'sub':player.player_name})
+
     # logged in
     return RedirectResponse(url=f"/home", status_code=303)
 
@@ -101,3 +106,10 @@ def login_page(request: Request):
     return templates.TemplateResponse(request, 'login.html', {
         'request': request
     })
+
+
+
+
+@auths_router.post('/refresh')
+def get_refresh_token(db:Session=Depends(get_db),refresh_token=str):
+    pass

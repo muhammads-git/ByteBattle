@@ -50,3 +50,17 @@ class Question(Base):
    question = Column(Text, nullable=False)
    options = Column(ARRAY(String), nullable=False)
    correct_option = Column(Integer, nullable=False)
+
+
+# refresh tokne
+class RefreskToken(Base):
+   __tablename__='refresh_tokens'
+   id = Column(Integer,primary_key=True,autoincrement=True)
+   token = Column(String,unique=True,nullable=False)
+   is_revoked =Column(Boolean,default=False,nullable=False)
+   expires_at = Column(DateTime,nullable=False)
+
+   # users.id
+   player_id = Column(Integer,ForeignKey('players.id'),nullable=False)
+
+
