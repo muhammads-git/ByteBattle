@@ -12,6 +12,7 @@ load_dotenv()
 SECRET_KEY = os.getenv('SECRET_KEY')
 ALGORITHM = os.getenv('ALGORITHM')
 DEFAULT_EXPIRY_MINUTES = int(os.getenv('DEFAULT_EXPIRY_MINUTES'))
+DEFAULT_REFRESH_TOKEN_EXPIRY_MINUTES = int(os.getenv('DEFAULT_REFRESH_TOKEN_EXPIRY_MINUTES'))
 
 def createAccessToken(data :dict, expires_at : timedelta | None = None):
    """ Generate jwt token using the payloads,
@@ -50,8 +51,25 @@ def decodeAccessToken(token : str):
 
 
 # refresh token
-def getRefreshToken(token : str):
-   pass
+
+def getRefreshToken(data :dict, expires_at : timedelta | None = None):
+   """ Generate jwt token using the payloads,
+      secret key signs this using algo
+   """
+   payload = data.copy()
+
+   if expires_at:
+      expires_at = datetime.now(timezone.utc) + expires_at
+   else:
+      expires_at = datetime.now(timezone.utc) + timedelta(days=DEFAULT_REFRESH_TOKEN_EXPIRY_MINUTES)
+
+   # update payload with the expiry time
+   payload.update({'exp':expires_at})
+
+
+   encoded_refresh_token = jwt.encode(payload,SECRET_KEY,algorithm=ALGORITHM)
+
+   return encoded_refresh_token
 
 
 # get current user
