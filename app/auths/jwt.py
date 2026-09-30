@@ -27,7 +27,7 @@ def createAccessToken(data :dict, expires_at : timedelta | None = None):
    # time
    expires_at = datetime.now(timezone.utc) + timedelta(minutes=30)
    # update payload with the expiry time
-   payload.update({'exp':expires_at})
+   payload.update({'exp':expires_at,'type':'access'})
 
 
    encoded_token = jwt.encode(payload,SECRET_KEY,algorithm=ALGORITHM)
@@ -64,7 +64,7 @@ def getRefreshToken(data :dict, expires_at : timedelta | None = None):
       expires_at = datetime.now(timezone.utc) + timedelta(days=DEFAULT_REFRESH_TOKEN_EXPIRY_MINUTES)
 
    # update payload with the expiry time
-   payload.update({'exp':expires_at})
+   payload.update({'exp':expires_at,'type':'refresh'})
 
 
    encoded_refresh_token = jwt.encode(payload,SECRET_KEY,algorithm=ALGORITHM)

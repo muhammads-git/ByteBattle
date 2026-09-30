@@ -6,7 +6,7 @@ from app.database import get_db
 from sqlalchemy.orm import Session
 from app.services.room import templates
 from app.security import PasswordManager
-from app.auths.jwt import createAccessToken,getRefreshToken
+from app.auths.jwt import createAccessToken,getRefreshToken,get_current_user
 
 auths_router = APIRouter()
 
@@ -86,10 +86,37 @@ def login(request:Request,
 
     # login success
     # create/return  jwt token
-    token = createAccessToken({'sub':player.player_name})
+    access_token = createAccessToken({'sub':player.player_name})
+    # create/return refresh_token
+    refresh_token = getRefreshToken({'sub':player.player_name})
 
-    # logged in
-    return RedirectResponse(url=f"/home", status_code=303)
+    #creaste response obj
+    response = RedirectResponse(url=f"/home", status_code=303)
+
+
+    # Set the short-lived Access Token Cookie
+    response.set_cookie(
+    key="access_token",
+    value=access_token,
+    httponly=True,       # Prevents JavaScript from reading the token (XSS Protection)
+    samesite="lax",      # Protects against CSRF attacks for normal navigation
+    secure=False,        # Set to True in production (forces HTTPS only)
+    max_age=1800          # 30 minutes in seconds (expires automatically)
+    )
+
+    #Set the long-lived Refresh Token Cookie
+    response.set_cookie(
+    key="refresh_token",
+    value=refresh_token,
+    httponly=True,
+    samesite="lax", # protect against csrf attacks any requets GET?POST
+    secure=False,
+    path="/auths/refresh", #  Only sends this cookie when hitting the refresh endpoint!
+    max_age=604800        # 7 days in seconds
+    )
+
+    # Return the configured response object
+    return response
 
 
 
@@ -111,5 +138,18 @@ def login_page(request: Request):
 
 ##### refresh tokennnn..  request
 @auths_router.post('/refresh')
-def get_refresh_token(db:Session=Depends(get_db),refresh_token=str):
+def get_refresh_token(db:Session=Depends(get_db),current_user=Depends(get_current_user)):
+    """
+    fetch the refresh token from httpOnly and db where user is this.
+    match both
+    check if the refreh of db revoked=False and == to httpOnly
+    
+    then:
+        revoked=True old refresh expired..
+        create:
+                refresh
+                access
+    return both to where they need to be, for the same rotations.. and valdiations...
+    """
+
     pass
