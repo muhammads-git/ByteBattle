@@ -53,7 +53,7 @@ class Question(Base):
 
 
 # refresh tokne
-class RefreskToken(Base):
+class RefreshToken(Base):
    __tablename__='refresh_tokens'
    id = Column(Integer,primary_key=True,autoincrement=True)
    token = Column(String,unique=True,nullable=False)
