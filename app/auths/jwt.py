@@ -10,7 +10,7 @@ from app.database import get_db
 load_dotenv()
 
 SECRET_KEY = os.getenv('SECRET_KEY')
-ALGORITHM = os.getenv('ALGORITHM')
+ALGORITHM = os.getenv('JWT_ALGORITHM')
 DEFAULT_EXPIRY_MINUTES = int(os.getenv('DEFAULT_EXPIRY_MINUTES'))
 DEFAULT_REFRESH_TOKEN_EXPIRY_MINUTES = int(os.getenv('DEFAULT_REFRESH_TOKEN_EXPIRY_MINUTES'))
 

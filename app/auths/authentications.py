@@ -7,6 +7,12 @@ from sqlalchemy.orm import Session
 from app.services.room import templates
 from app.security import PasswordManager
 from app.auths.jwt import createAccessToken,getRefreshToken,get_current_user
+import os
+import jwt
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 auths_router = APIRouter()
 
@@ -165,8 +171,56 @@ def get_refresh_token(request:Request,response:Response,db:Session=Depends(get_d
     if db_refresh_token.is_revoked:
         # somthin gis wrong
         db.query(RefreshToken).filter(RefreshToken.player_id == db_refresh_token.player_id).update({'is_revoked':True})
+        # db.commit()
+        raise HTTPException(status_code=401,message='Security Alert! All sessions are terminated.')
+
+    # check if token expired by time
+    if db_refresh_token.expires_at > datetime.now(timezone.utc):
+        raise HTTPException(status_code=401,message='Session has expired, please login again.')
+
+    try:
+        # fetch username from decoding the token
+        payload = jwt.decode(http_only_refresh_token,os.getenv('SECRET_KEY'),os.getenv('JWT_ALGORITHM'))
+        player_name = payload.get('sub')
+        # create fresh access and refresh token
+        fresh_access = createAccessToken({'sub':player_name})
+        fresh_refresh = getRefreshToken({'sub':player_name})
+
+        # // revok the OLD refrsh token in database
+        db_refresh_token.is_revoked = True
+        
+        # insert new refresh token in db
+        new_refresh_token = RefreshToken(
+            player_id=db_refresh_token.player_id,
+            token=fresh_refresh,
+            expire_at=datetime.now(timezone.utc) + timedelta(days=7)
+        )
+        db.add(new_refresh_token)
         db.commit()
-        raise HTTPException(status_code='401',message='Security Alert! All sessions are terminated.')
 
-    # if not..
 
+        # Return both fresh tokens to the browser by overwriting the cookies completely
+        response.set_cookie(
+        key="access_token", 
+        value=new_access_token, 
+        httponly=True, 
+        samesite="lax",
+        secure=False,
+        max_age=1800          # 15 minutes fresh countdown (in seconds)
+        )
+
+        response.set_cookie(
+        key="refresh_token", 
+        value=new_refresh_token, 
+        httponly=True, 
+        samesite="lax", 
+        path="/auths/refresh",
+        secure=False,
+        max_age=604800       # 7 days fresh countdown (in seconds)
+        )
+
+        return {"status": "success", "message": "Tokens rotated successfully"}
+
+
+    except jwt.JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token signature.")
