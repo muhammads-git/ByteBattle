@@ -202,7 +202,7 @@ def get_refresh_token(request:Request,response:Response,db:Session=Depends(get_d
         # Return both fresh tokens to the browser by overwriting the cookies completely
         response.set_cookie(
         key="access_token", 
-        value=new_access_token, 
+        value=fresh_access, 
         httponly=True, 
         samesite="lax",
         secure=False,
@@ -211,7 +211,7 @@ def get_refresh_token(request:Request,response:Response,db:Session=Depends(get_d
 
         response.set_cookie(
         key="refresh_token", 
-        value=new_refresh_token, 
+        value=fresh_refresh, 
         httponly=True, 
         samesite="lax", 
         path="/auths/refresh",

@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError
 import random
 import string
 from datetime import datetime,timezone
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, Request,HTTPException,status
 from fastapi.responses import RedirectResponse
 from app.templates_configs import templates
 
@@ -19,19 +19,24 @@ def generate_unique_room_code(length=6):
 
 
 @room_router.post('/rooms')
-def create_room(player_id: str = Form(...), db: Session = Depends(get_db)):
+def create_room(player_id: int = Form(...), db: Session = Depends(get_db)):
     code = generate_unique_room_code()
 
+    # 1. Safely calculate random questions pool bounds
     question_count = db.query(Question).count()
+    if question_count < 3:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Not enough questions in the database to seed a match."
+        )
+        
     random_questions = random.sample(range(1, question_count + 1), k=3)
     questions = db.query(Question.id).filter(Question.id.in_(random_questions)).all()
     list_quest = [q[0] for q in questions]
 
-    if len(list_quest) < 3:
-        raise ValueError('Not enough questions in the database to create a room.')
-
     while True:
         try:
+            # Explicitly force host_id as integer matching your model schema constraint
             new_room = Room(room_code=code, host_id=player_id, room_quizes=list_quest)
             db.add(new_room)
             db.commit()
@@ -43,11 +48,13 @@ def create_room(player_id: str = Form(...), db: Session = Depends(get_db)):
                 code = generate_unique_room_code()
                 continue
             elif 'foreign key' in error_msg or 'violates fk' in error_msg:
-                raise ValueError(f"Cannot create room: Host Player ID '{player_id}' does not exist.")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Host Player ID '{player_id}' does not exist inside registry reference."
+                )
             else:
                 raise e
 
-    # room created -> send the host straight to their new lobby
     return RedirectResponse(url=f"/rooms/{new_room.room_code}", status_code=303)
 
 
@@ -83,15 +90,22 @@ def join_room(room_code: str, player_id: int = Form(...), db: Session = Depends(
 def view_lobby(request: Request, room_code: str, db: Session = Depends(get_db)):
     room = db.query(Room).filter(Room.room_code == room_code).first()
     if not room:
-        raise ValueError("Room doesn't exist.")
+        raise HTTPException(status_code=404, detail="Target match lobby does not exist.")
 
-    players = db.query(RoomPlayer).filter(RoomPlayer.room_id == room.id).all()
+    # 2. Fix the name-access trap using an inner join mapping to the Players table
+    # This cleanly extracts the player_name string directly into your template dataset
+    joined_players = db.query(Player.player_name, RoomPlayer.score, Player.id).\
+        join(RoomPlayer, RoomPlayer.player_id == Player.id).\
+        filter(RoomPlayer.room_id == room.id).all()
 
-    return templates.TemplateResponse(request,"lobby.html", {
+    # (Future Authentication integration point to swap out this placeholder boolean)
+    is_viewer_host = False 
+
+    return templates.TemplateResponse(request, "lobby.html", {
         "request": request,
         "room_code": room.room_code,
-        "players": players,       # template expects .name / .is_host — see note below
-        "is_host": False,         # placeholder until auth tells you who's viewing
+        "players": joined_players,  # Template access loops now process: player.player_name and player.score cleanly
+        "is_host": is_viewer_host,
     })
 
 
