@@ -131,3 +131,10 @@ def start_room(room_code: str, host_id: int = Form(...), db: Session = Depends(g
 
     # game is live -> send everyone into the arena
     return RedirectResponse(url=f"/rooms/{room_code}/play", status_code=303)
+
+
+
+@room_router.get('/rooms/{room_code}/play')
+def play_arena(request:Request, room_code : str,db:Session = Depends(get_db)):
+    pass
+
