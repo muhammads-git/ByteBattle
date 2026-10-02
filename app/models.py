@@ -33,9 +33,9 @@ class RoomPlayer(Base):
    player_id = Column(Integer, ForeignKey('players.id'), nullable=False)
    score = Column(Integer, default=0, nullable=False)
    joined_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-   # --- ADD THESE TWO COLUMNS FOR THE FAKE OUT ---
-   # current_round_lie = Column(Text, nullable=True)     # Stores the fake answer they invented
-   # current_round_vote = Column(Integer, nullable=True) # Stores the option index they voted for
+   # --- TWO COLUMNS FOR THE FAKE OUT ---
+   current_round_lie = Column(Text, nullable=True)     # Stores the fake answer they invented
+   current_round_vote = Column(Integer, nullable=True) # Stores the option index they voted for
 
 class Player(Base):
    __tablename__ = 'players'

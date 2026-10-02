@@ -136,5 +136,25 @@ def start_room(room_code: str, host_id: int = Form(...), db: Session = Depends(g
 
 @room_router.get('/rooms/{room_code}/play')
 def play_arena(request:Request, room_code : str,db:Session = Depends(get_db)):
-    pass
+    room = db.query(Room).filter(Room.room_code == room_code).first()
+    if not room:
+        raise HTTPException(status_code=404,message="Room doesn't exist.")
 
+
+    """ fetch the questions from question, by first finding the current_room's
+    quiz index....
+    """
+    question_ID = room.room_quizes[room.current_question_index]
+
+    question = db.query(Question).filter(Question.id == question_ID).first()
+
+
+    return templates.TemplateResponse(request, 'arena.html',
+    {
+        'request':request,
+        'question':question.question,
+        'options': question.options,
+        'correct_option':question.correct_option
+    })
+
+    
