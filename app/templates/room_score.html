@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Final scores — ByteBattle{% endblock %}
+{% block main_class %}center-col{% endblock %}
+
+{#
+  Context this template expects:
+    room_code   str
+    players     list sorted high -> low; each item has .name, .score, .is_you
+                (build it by joining RoomPlayer with Player, RoomPlayer has no name)
+#}
+
+{% block content %}
+  <div class="eyebrow-plain">Room {{ room_code }}</div>
+  <h1>Final scores</h1>
+
+  {% set me = players | selectattr('is_you') | first %}
+  {% if me %}
+    <div class="score-display">{{ me.score }}</div>
+    <div class="score-label">your points &middot; ranked #{{ players.index(me) + 1 }} of {{ players|length }}</div>
+  {% endif %}
+
+  {% if players %}
+    <p style="margin: 1.25rem 0 1.5rem;">Winner: <strong style="color: var(--marker);">{{ players[0].name }}</strong></p>
+  {% endif %}
+
+  <div class="panel" style="width: 100%; max-width: 480px; text-align: left;">
+    <ul class="rank-list">
+      {% for p in players %}
+      <li class="rank-row {% if p.is_you %}you{% endif %}">
+        <span class="rank-num">{{ loop.index }}</span>
+        <span class="rank-name">{{ p.name }}{% if p.is_you %} (you){% endif %}</span>
+        <span class="rank-score">{{ p.score }} pts</span>
+      </li>
+      {% else %}
+      <li style="color: var(--chalk-dim); padding: 0.85rem 0.3rem;">No scores yet.</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="result-actions">
+    <a href="/rooms/{{ room_code }}/leaderboard" class="btn btn-primary">View leaderboard</a>
+    <a href="/home" class="btn btn-outline">Back to home</a>
+  </div>
+{% endblock %}

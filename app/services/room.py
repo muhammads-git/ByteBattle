@@ -1,17 +1,24 @@
-from app.models import Room, RoomPlayer, Player, Question
-from app.database import get_db
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
 import random
 import string
-from datetime import datetime,timezone
-from fastapi import APIRouter, Depends, Form, Request,HTTPException,status,Form
-from fastapi.responses import RedirectResponse
-from app.templates_configs import templates
-from app.engine import calculateScore
-from app.auths.jwt import get_current_user
-room_router = APIRouter()
+from datetime import datetime, timezone
 
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
+from fastapi.responses import RedirectResponse
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from app.auths.jwt import get_current_user
+from app.database import get_db
+from app.engine import calculateScore
+from app.models import Player, Question, Room, RoomPlayer
+from app.templates_configs import templates
+
+QUESTION_SECONDS = 15
+
+# Router-level dependency: every route in this file requires a logged-in user,
+# and a route added later cannot forget it. Routes that need the user object
+# still declare `current_user` themselves; FastAPI runs the dependency once per request.
+room_router = APIRouter(dependencies=[Depends(get_current_user)])
 
 
 def generate_unique_room_code(length=6):
@@ -19,27 +26,46 @@ def generate_unique_room_code(length=6):
     return ''.join(random.choices(chars_digits, k=length))
 
 
-@room_router.post('/rooms')
-def create_room(player_id: int = Form(...), db: Session = Depends(get_db)):
-    code = generate_unique_room_code()
+def get_room_or_404(db: Session, room_code: str) -> Room:
+    room = db.query(Room).filter(Room.room_code == room_code).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="Room doesn't exist.")
+    return room
 
-    # 1. Safely calculate random questions pool bounds
+
+def get_membership(db: Session, room: Room, user) -> RoomPlayer | None:
+    return db.query(RoomPlayer).filter(
+        RoomPlayer.room_id == room.id, RoomPlayer.player_id == user.id
+    ).first()
+
+
+def require_member(db: Session, room: Room, user) -> RoomPlayer:
+    member = get_membership(db, room, user)
+    if not member:
+        raise HTTPException(status_code=403, detail="You haven't joined this room.")
+    return member
+
+
+@room_router.post('/rooms')
+def create_room(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     question_count = db.query(Question).count()
     if question_count < 3:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
-            detail="Not enough questions in the database to seed a match."
-        )
-        
+        raise HTTPException(status_code=400, detail="Not enough questions in the database to seed a match.")
+
     random_questions = random.sample(range(1, question_count + 1), k=3)
     questions = db.query(Question.id).filter(Question.id.in_(random_questions)).all()
     list_quest = [q[0] for q in questions]
+    if len(list_quest) < 3:
+        raise HTTPException(status_code=400, detail="Could not pick 3 questions.")
 
+    code = generate_unique_room_code()
     while True:
         try:
-            # Explicitly force host_id as integer matching your model schema constraint
-            new_room = Room(room_code=code, host_id=player_id, room_quizes=list_quest)
+            new_room = Room(room_code=code, host_id=current_user.id, room_quizes=list_quest)
             db.add(new_room)
+            db.flush()  # gives new_room.id without committing yet
+            # the host plays too, so the host needs a RoomPlayer row as well
+            db.add(RoomPlayer(room_id=new_room.id, player_id=current_user.id))
             db.commit()
             break
         except IntegrityError as e:
@@ -48,169 +74,204 @@ def create_room(player_id: int = Form(...), db: Session = Depends(get_db)):
             if 'unique' in error_msg or 'duplicate' in error_msg:
                 code = generate_unique_room_code()
                 continue
-            elif 'foreign key' in error_msg or 'violates fk' in error_msg:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Host Player ID '{player_id}' does not exist inside registry reference."
-                )
-            else:
-                raise e
+            raise
 
-    return RedirectResponse(url=f"/rooms/{new_room.room_code}", status_code=303)
+    return RedirectResponse(url=f"/rooms/{code}", status_code=303)
 
 
 @room_router.post('/rooms/{room_code}/players')
-def join_room(room_code: str, player_id: int = Form(...), db: Session = Depends(get_db)):
-    room = db.query(Room).filter(Room.room_code == room_code).first()
-    if not room:
-        raise ValueError("Room doesn't exist.")
+def join_room(room_code: str, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    room = get_room_or_404(db, room_code)
 
-    player_exists = db.query(RoomPlayer).filter(
-        RoomPlayer.player_id == player_id, RoomPlayer.room_id == room.id
-    ).first()
-    if player_exists:
-        raise ValueError('Player has already joined the room.')
+    # re-clicking the link is not an error, just land in the lobby again
+    if get_membership(db, room, current_user):
+        return RedirectResponse(url=f"/rooms/{room_code}", status_code=303)
 
     if room.room_state == 'in_progress':
-        raise ValueError('Room has already started.')
-    elif room.room_state == 'ended':
-        raise ValueError('Room has already ended.')
-
+        raise HTTPException(status_code=400, detail="Room has already started.")
+    if room.room_state == 'ended':
+        raise HTTPException(status_code=400, detail="Room has already ended.")
     if room.expires_at < datetime.now(timezone.utc):
-      raise ValueError('Room is expired.')
+        raise HTTPException(status_code=400, detail="Room is expired.")
 
-    join = RoomPlayer(player_id=player_id, room_id=room.id)
-    db.add(join)
+    db.add(RoomPlayer(player_id=current_user.id, room_id=room.id))
     db.commit()
 
-    # joined successfully -> land in the same lobby everyone else sees
     return RedirectResponse(url=f"/rooms/{room_code}", status_code=303)
 
 
 @room_router.get('/rooms/{room_code}')
-def view_lobby(request: Request, room_code: str, db: Session = Depends(get_db)):
-    room = db.query(Room).filter(Room.room_code == room_code).first()
-    if not room:
-        raise HTTPException(status_code=404, detail="Target match lobby does not exist.")
+def view_lobby(
+    request: Request,
+    room_code: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    room = get_room_or_404(db, room_code)
 
-    # 2. Fix the name-access trap using an inner join mapping to the Players table
-    # This cleanly extracts the player_name string directly into your template dataset
-    joined_players = db.query(Player.player_name, RoomPlayer.score, Player.id).\
-        join(RoomPlayer, RoomPlayer.player_id == Player.id).\
-        filter(RoomPlayer.room_id == room.id).all()
+    rows = (
+        db.query(Player.player_name, Player.id)
+        .join(RoomPlayer, RoomPlayer.player_id == Player.id)
+        .filter(RoomPlayer.room_id == room.id)
+        .all()
+    )
+    players = [{"name": name, "is_host": pid == room.host_id} for name, pid in rows]
+    is_member = any(pid == current_user.id for _, pid in rows)
 
-    # (Future Authentication integration point to swap out this placeholder boolean)
-    is_viewer_host = False 
+    # a member opening the link after the game began goes straight to the right page
+    if is_member and room.room_state == 'in_progress':
+        return RedirectResponse(url=f"/rooms/{room_code}/play", status_code=303)
+    if is_member and room.room_state == 'ended':
+        return RedirectResponse(url=f"/rooms/{room_code}/scores", status_code=303)
 
     return templates.TemplateResponse(request, "lobby.html", {
         "request": request,
         "room_code": room.room_code,
-        "players": joined_players,  # Template access loops now process: player.player_name and player.score cleanly
-        "is_host": is_viewer_host,
+        "players": players,
+        "is_host": room.host_id == current_user.id,
+        "is_member": is_member,
     })
 
 
 @room_router.post('/rooms/{room_code}/start')
-def start_room(room_code: str, host_id: int = Form(...), db: Session = Depends(get_db)):
-    room_exists = db.query(Room).filter(Room.room_code == room_code).first()
-    if not room_exists:
-        raise ValueError('Room does not exist.')
-    if room_exists.host_id != host_id:
-        raise ValueError('Unauthorized action.')
-    if room_exists.room_state == 'in_progress':
-        raise ValueError('Room already started.')
-    if room_exists.room_state == 'ended':
-        raise ValueError('Room is ended.')
-    if room_exists.expires_at < datetime.now(timezone.utc):
-      raise ValueError('Room is expired.')
+def start_room(room_code: str, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    room = get_room_or_404(db, room_code)
+
+    if room.host_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the host can start the game.")
+    if room.room_state == 'in_progress':
+        raise HTTPException(status_code=400, detail="Room already started.")
+    if room.room_state == 'ended':
+        raise HTTPException(status_code=400, detail="Room has ended.")
+    if room.expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="Room is expired.")
 
     now = datetime.now(timezone.utc)
-    room_exists.room_started_at = now
-    room_exists.current_question_started_at = now
-    room_exists.room_state = 'in_progress'
+    room.room_started_at = now
+    room.current_question_started_at = now
+    room.room_state = 'in_progress'
     db.commit()
 
-    # game is live -> send everyone into the arena
     return RedirectResponse(url=f"/rooms/{room_code}/play", status_code=303)
 
 
-
 @room_router.get('/rooms/{room_code}/play')
-def play_arena(request:Request, room_code : str,db:Session = Depends(get_db)):
-    room = db.query(Room).filter(Room.room_code == room_code).first()
-    if not room:
-        raise HTTPException(status_code=404,detail="Room doesn't exist.")
+def play_arena(
+    request: Request,
+    room_code: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    room = get_room_or_404(db, room_code)
+    member = require_member(db, room, current_user)
 
+    if room.room_state == 'waiting':
+        return RedirectResponse(url=f"/rooms/{room_code}", status_code=303)
+    if room.room_state == 'ended':
+        return RedirectResponse(url=f"/rooms/{room_code}/scores", status_code=303)
 
-    """ fetch the questions from question, by first finding the current_room's
-    quiz index....
-    """
-    question_ID = room.room_quizes[room.current_question_index]
+    question = db.query(Question).filter(
+        Question.id == room.room_quizes[room.current_question_index]
+    ).first()
 
-    question = db.query(Question).filter(Question.id == question_ID).first()
+    elapsed = (datetime.now(timezone.utc) - room.current_question_started_at).total_seconds()
+    seconds_left = max(0, QUESTION_SECONDS - int(elapsed))
 
+    players_q = db.query(RoomPlayer).filter(RoomPlayer.room_id == room.id)
+    total_players = players_q.count()
+    answered_count = players_q.filter(
+        RoomPlayer.last_answered_index == room.current_question_index
+    ).count()
 
-    return templates.TemplateResponse(request, 'arena.html',
-    {
-        'request':request,
-        'question':question.question,
+    # note: correct_option is deliberately NOT sent to the browser
+    return templates.TemplateResponse(request, 'arena.html', {
+        'request': request,
+        'room_code': room_code,
+        'question_number': room.current_question_index + 1,
+        'total_questions': len(room.room_quizes),
+        'question_index': room.current_question_index,
+        'code_snippet': question.question,
         'options': question.options,
-        'correct_option':question.correct_option
+        'seconds_left': seconds_left,
+        'total_seconds': QUESTION_SECONDS,
+        'answered_count': answered_count,
+        'total_players': total_players,
+        'already_answered': member.last_answered_index == room.current_question_index,
     })
 
-    """ """
-
-
-from datetime import datetime
-from fastapi import Request, Depends, Form
-from fastapi.responses import HTMLResponse
-from sqlalchemy.orm import Session
 
 @room_router.post('/rooms/{room_code}/answer')
 def submit_answer(
+    room_code: str,
+    option_index: int = Form(...),
+    question_index: int = Form(...),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    room = get_room_or_404(db, room_code)
+    if room.room_state != 'in_progress':
+        raise HTTPException(status_code=400, detail="Room is not in progress.")
+
+    play_url = f"/rooms/{room_code}/play"
+
+    # stale submit: the round moved on while the player was answering
+    if question_index != room.current_question_index:
+        return RedirectResponse(url=play_url, status_code=303)
+
+    # row lock: a double-click cannot add the score twice
+    player = (
+        db.query(RoomPlayer)
+        .filter(RoomPlayer.room_id == room.id, RoomPlayer.player_id == current_user.id)
+        .with_for_update()
+        .first()
+    )
+    if not player:
+        raise HTTPException(status_code=403, detail="You haven't joined this room.")
+
+    if player.last_answered_index == room.current_question_index:
+        return RedirectResponse(url=play_url, status_code=303)
+
+    question = db.query(Question).filter(
+        Question.id == room.room_quizes[room.current_question_index]
+    ).first()
+
+    time_taken = (datetime.now(timezone.utc) - room.current_question_started_at).total_seconds()
+    is_correct = (option_index == question.correct_option)
+
+    player.score += calculateScore(time_taken, is_correct)
+    player.last_answered_index = room.current_question_index
+    db.commit()
+
+    return RedirectResponse(url=play_url, status_code=303)
+
+
+@room_router.get('/rooms/{room_code}/scores')
+def room_scores(
     request: Request,
     room_code: str,
-    option_index: int = Form(...), 
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)  # <--- Aapki dependency
+    current_user=Depends(get_current_user),
 ):
-    # 1. Room fetch karein
-    room = db.query(Room).filter(Room.room_code == room_code).first()
+    room = get_room_or_404(db, room_code)
+    require_member(db, room, current_user)
 
-    # 2. Current question nikalen
-    current_question_id = room.room_quize[room.current_question_index]
-    question = db.query(Question).filter(Question.id == current_question_id).first()
+    if room.room_state != 'ended':
+        return RedirectResponse(url=f"/rooms/{room_code}/play", status_code=303)
 
-    # 3. Time taken calculate karein
-    submission_time = datetime.utcnow()
-    time_delta = submission_time - room.question_started_at 
-    time_taken = time_delta.total_seconds() 
-
-    # 4. Check correctness & calculate score
-    is_correct = (question.correct_option == option_index)
-    score_earned = calculateScore(time_taken=time_taken, is_correct=is_correct)
-    
-    # 5. Player ko username se fetch karke score INCREMENT karein
-    player = db.query(RoomPlayer).filter(
-        RoomPlayer.room_id == room.id,
-        RoomPlayer.username == current_user.username  # Temporary approach
-    ).first()
-    
-    if player:
-        player.total_score += score_earned
-        db.commit()
-
-    # 6. RETURN / REDIRECT 
-    all_players = db.query(RoomPlayer).filter(RoomPlayer.room_id == room.id).order_by(RoomPlayer.score.desc()).all()
-
-    return templates.TemplateResponse(request,
-        "room_scores.html", 
-        {
-            "request": request, 
-            "room_code": room_code,
-            "players": all_players,
-            "your_score_earned": score_earned,
-            "was_correct": is_correct
-        }
+    rows = (
+        db.query(RoomPlayer, Player.player_name)
+        .join(Player, Player.id == RoomPlayer.player_id)
+        .filter(RoomPlayer.room_id == room.id)
+        .order_by(RoomPlayer.score.desc())
+        .all()
     )
+    players = [
+        {"name": name, "score": rp.score, "is_you": rp.player_id == current_user.id}
+        for rp, name in rows
+    ]
 
+    return templates.TemplateResponse(request, "room_scores.html", {
+        "request": request,
+        "room_code": room_code,
+        "players": players,
+    })

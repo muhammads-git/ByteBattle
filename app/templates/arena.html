@@ -1,6 +1,14 @@
 {% extends "base.html" %}
 {% block title %}Question {{ question_number }} — ByteBattle{% endblock %}
 
+{#
+  Context this template expects (new ones marked *):
+    question_number, total_questions, answered_count, total_players,
+    seconds_left (>= 0), total_seconds, code_snippet, options, room_code,
+    question_index*     -> room.current_question_index
+    already_answered*   -> player.last_answered_index == room.current_question_index
+#}
+
 {% block header_right %}
 <span class="mono" style="color: var(--chalk-dim); font-size: 0.9rem;">Question {{ question_number }} of {{ total_questions }}</span>
 {% endblock %}
@@ -8,33 +16,43 @@
 {% block content %}
   <div class="arena-top">
     <span class="answered-count">{{ answered_count }} of {{ total_players }} answered</span>
-    <div class="timer-ring{% if seconds_left <= 5 %} urgent{% endif %}" id="timer-ring" style="--pct: {{ seconds_left / total_seconds }};">
+    <div class="timer-ring{% if seconds_left <= 5 %} urgent{% endif %}" id="timer-ring" data-seconds-left="{{ seconds_left }}" data-total-seconds="{{ total_seconds }}" style="--pct: {{ seconds_left / total_seconds }};">
       <span id="timer-value">{{ seconds_left }}</span>
     </div>
   </div>
 
   <div class="code-block"><code>{{ code_snippet }}</code></div>
 
-  <form method="post" action="/rooms/{{ room_code }}/answer">
-    <div class="options-grid">
-      {% for option in options %}
-      <button type="submit" name="option_index" value="{{ loop.index0 }}" class="option-btn">
-        <span class="key">{{ "ABCD"[loop.index0] }}</span>
-        {{ option }}
-      </button>
-      {% endfor %}
+  {% if already_answered %}
+    <div class="panel" style="text-align: center;">
+      <h3 style="margin-bottom: 0.3rem;">Answer locked</h3>
+      <p style="margin: 0 auto;">Waiting for the next question&hellip;</p>
     </div>
-  </form>
+  {% else %}
+    <form method="post" action="/rooms/{{ room_code }}/answer">
+      <input type="hidden" name="question_index" value="{{ question_index }}">
+      <div class="options-grid">
+        {% for option in options %}
+        <button type="submit" name="option_index" value="{{ loop.index0 }}" class="option-btn">
+          <span class="key">{{ "ABCD"[loop.index0] }}</span>
+          {{ option }}
+        </button>
+        {% endfor %}
+      </div>
+    </form>
+  {% endif %}
 {% endblock %}
 
 {% block scripts %}
 <script>
-  // Purely visual countdown — the server's clock is what actually decides when
-  // the round ends; this just keeps the ring honest between page refreshes.
+  // The ring is only visual; the server clock decides when a round ends.
+  // When it hits zero we reload so the server can show the next question,
+  // or redirect to the scores page if the room has ended. The 3.5s wait is
+  // longer than the 3s background job, so the room has had time to advance.
   (function () {
-    let secondsLeft = {{ seconds_left }};
-    const totalSeconds = {{ total_seconds }};
     const ring = document.getElementById('timer-ring');
+    let secondsLeft = Number(ring.dataset.secondsLeft);
+    const totalSeconds = Number(ring.dataset.totalSeconds);
     const label = document.getElementById('timer-value');
 
     const tick = setInterval(() => {
@@ -42,6 +60,7 @@
       if (secondsLeft <= 0) {
         clearInterval(tick);
         secondsLeft = 0;
+        setTimeout(() => location.reload(), 3500);
       }
       label.textContent = secondsLeft;
       ring.style.setProperty('--pct', secondsLeft / totalSeconds);

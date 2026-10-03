@@ -32,16 +32,17 @@ class RoomPlayer(Base):
    room_id = Column(Integer, ForeignKey('rooms.id'), nullable=False)
    player_id = Column(Integer, ForeignKey('players.id'), nullable=False)
    score = Column(Integer, default=0, nullable=False)
+   last_answered_index = Column(Integer, default=-1, server_default='-1', nullable=False)
    joined_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
    # --- TWO COLUMNS FOR THE FAKE OUT ---
-   current_round_lie = Column(Text, nullable=True)     # Stores the fake answer they invented
-   current_round_vote = Column(Integer, nullable=True) # Stores the option index they voted for
+   # current_round_lie = Column(Text, nullable=True)     # Stores the fake answer they invented
+   # current_round_vote = Column(Integer, nullable=True) # Stores the option index they voted for
 
 class Player(Base):
    __tablename__ = 'players'
    id = Column(Integer, primary_key=True, autoincrement=True)
    player_name = Column(String(255), nullable=False, unique=True)
-   roll_no = Column(String(50), ForeignKey('student_registry.roll_no'),unique=True, nullable=False)
+   roll_no = Column(String(50),unique=True, nullable=False)
    password_hash = Column(String(255), nullable=False)
 
 class Question(Base):
