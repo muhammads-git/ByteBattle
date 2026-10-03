@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Form, Request,HTTPException,status,Form
 from fastapi.responses import RedirectResponse
 from app.templates_configs import templates
 from app.engine import calculateScore
-
+from app.auths.jwt import get_current_user
 room_router = APIRouter()
 
 
@@ -163,8 +163,10 @@ def play_arena(request:Request, room_code : str,db:Session = Depends(get_db)):
 
 
 @room_router.post('/rooms/{room_code}/answer')
-def submit_answer(request:Request,room_code :str,option_index : int = Form(...), db:Session=Depends(get_db)):
-    
+def submit_answer(request:Request,room_code :str,option_index : int = Form(...), db:Session=Depends(get_db),current_user=Depends(get_current_user)):
+    # user
+    user = db.query(Player).filter(Player.player_name == current_user.username).first()
+
     room = db.query(Room).filter(Room.room_code == room_code).first()
 
     current_question_index = room.room_quize[room.current_question_index]
@@ -188,6 +190,16 @@ def submit_answer(request:Request,room_code :str,option_index : int = Form(...),
 
 
     # save the score
+    new_score = RoomPlayer(
+        player_id=user.id,
+        room_id=room.id,
+        score=score
+    )
+    db.add(new_score)
+    db.commit()
 
+
+
+    #redirect...
 
     
