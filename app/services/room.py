@@ -5,9 +5,10 @@ from sqlalchemy.exc import IntegrityError
 import random
 import string
 from datetime import datetime,timezone
-from fastapi import APIRouter, Depends, Form, Request,HTTPException,status
+from fastapi import APIRouter, Depends, Form, Request,HTTPException,status,Form
 from fastapi.responses import RedirectResponse
 from app.templates_configs import templates
+from app.engine import calculateScore
 
 room_router = APIRouter()
 
@@ -138,7 +139,7 @@ def start_room(room_code: str, host_id: int = Form(...), db: Session = Depends(g
 def play_arena(request:Request, room_code : str,db:Session = Depends(get_db)):
     room = db.query(Room).filter(Room.room_code == room_code).first()
     if not room:
-        raise HTTPException(status_code=404,message="Room doesn't exist.")
+        raise HTTPException(status_code=404,detail="Room doesn't exist.")
 
 
     """ fetch the questions from question, by first finding the current_room's
@@ -156,5 +157,37 @@ def play_arena(request:Request, room_code : str,db:Session = Depends(get_db)):
         'options': question.options,
         'correct_option':question.correct_option
     })
+
+    """ """
+
+
+
+@room_router.post('/rooms/{room_code}/answer')
+def submit_answer(request:Request,room_code :str,option_index : int = Form(...), db:Session=Depends(get_db)):
+    
+    room = db.query(Room).filter(Room.room_code == room_code).first()
+
+    current_question_index = room.room_quize[room.current_question_index]
+
+    question = db.query(Question).filter(Question.id == current_question_index).first()
+
+    # check times
+    started_at = room.current_question_started_at
+    submission_time = datetime.now(timezone.utc)
+
+    # calculate
+    time_delta = submission_time - started_at
+    time_taken = time_delta.total_seconds()
+    # check if time_taken > 15
+    # check if the option is correct
+
+    if question.correct_option == option_index:
+        score = calculateScore(time_taken,True)
+    else:
+        score = calculateScore(time_taken,False)
+
+
+    # save the score
+
 
     
