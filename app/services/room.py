@@ -161,45 +161,56 @@ def play_arena(request:Request, room_code : str,db:Session = Depends(get_db)):
     """ """
 
 
+from datetime import datetime
+from fastapi import Request, Depends, Form
+from fastapi.responses import HTMLResponse
+from sqlalchemy.orm import Session
 
 @room_router.post('/rooms/{room_code}/answer')
-def submit_answer(request:Request,room_code :str,option_index : int = Form(...), db:Session=Depends(get_db),current_user=Depends(get_current_user)):
-    # user
-    user = db.query(Player).filter(Player.player_name == current_user.username).first()
-
+def submit_answer(
+    request: Request,
+    room_code: str,
+    option_index: int = Form(...), 
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)  # <--- Aapki dependency
+):
+    # 1. Room fetch karein
     room = db.query(Room).filter(Room.room_code == room_code).first()
 
-    current_question_index = room.room_quize[room.current_question_index]
+    # 2. Current question nikalen
+    current_question_id = room.room_quize[room.current_question_index]
+    question = db.query(Question).filter(Question.id == current_question_id).first()
 
-    question = db.query(Question).filter(Question.id == current_question_index).first()
+    # 3. Time taken calculate karein
+    submission_time = datetime.utcnow()
+    time_delta = submission_time - room.question_started_at 
+    time_taken = time_delta.total_seconds() 
 
-    # check times
-    started_at = room.current_question_started_at
-    submission_time = datetime.now(timezone.utc)
-
-    # calculate
-    time_delta = submission_time - started_at
-    time_taken = time_delta.total_seconds()
-    # check if time_taken > 15
-    # check if the option is correct
-
-    if question.correct_option == option_index:
-        score = calculateScore(time_taken,True)
-    else:
-        score = calculateScore(time_taken,False)
-
-
-    # save the score
-    new_score = RoomPlayer(
-        player_id=user.id,
-        room_id=room.id,
-        score=score
-    )
-    db.add(new_score)
-    db.commit()
-
-
-
-    #redirect...
-
+    # 4. Check correctness & calculate score
+    is_correct = (question.correct_option == option_index)
+    score_earned = calculateScore(time_taken=time_taken, is_correct=is_correct)
     
+    # 5. Player ko username se fetch karke score INCREMENT karein
+    player = db.query(RoomPlayer).filter(
+        RoomPlayer.room_id == room.id,
+        RoomPlayer.username == current_user.username  # Temporary approach
+    ).first()
+    
+    if player:
+        player.total_score += score_earned
+        db.commit()
+
+    # 6. RETURN / REDIRECT 
+    all_players = db.query(RoomPlayer).filter(RoomPlayer.room_id == room.id).order_by(RoomPlayer.score.desc()).all()
+
+    return templates.TemplateResponse(request,
+        "room_scores.html", 
+        {
+            "request": request, 
+            "room_code": room_code,
+            "players": all_players,
+            "your_score_earned": score_earned,
+            "was_correct": is_correct
+        }
+    )
+
