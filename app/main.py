@@ -6,7 +6,7 @@ from app.services.room import room_router
 from app.auths.authentications import auths_router
 
 app = FastAPI(lifespan=lifespan)
-app.include_router(room_router, prefix='/v1')
+app.include_router(room_router)
 app.include_router(auths_router,prefix='/auth')
 
 # serve style.css, etc. at /static/*

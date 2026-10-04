@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 import os
 from datetime import datetime, timezone,timedelta
 from fastapi.security import OAuth2PasswordBearer
-from fastapi import Depends,HTTPException
+from fastapi import Depends,HTTPException,Request
 from sqlalchemy.orm import Session
 from app.database import get_db
 
@@ -43,6 +43,8 @@ def decodeAccessToken(token : str):
 
    username = payload.get('sub')
 
+   print(f'Decode token returned: {username}')
+
    if not username:
       # raise Exception
       raise HTTPException(status_code=401, detail="Invalid token payload")
@@ -72,15 +74,24 @@ def getRefreshToken(data :dict, expires_at : timedelta | None = None):
    return encoded_refresh_token
 
 
+# get_Token from cookies 
+def get_token(request:Request) -> str:
+   token = request.cookies.get('access_token')
+   if not token:
+      raise HTTPException(status_code=401,detail='Not authenticated!')
+   return token
 # get current user
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl='/login')
+# oauth2_scheme = OAuth2PasswordBearer(tokenUrl='/auths/login')
+
 # FastAPI automatically extracts the token string from the headers and gives it to 'token'
-def get_current_user(token: str = Depends(oauth2_scheme)):
+def get_current_user(token: str = Depends(get_token)):
     try:
         # Now you decode the token that the client provided
         payload = decodeAccessToken(token)
         username: str = payload.get("sub")
+        print(type(username))
         if username is None:
+            print(username)
             raise HTTPException(status_code=401, detail="Invalid token payload")
         return username
     except jwt.PyJWTError:

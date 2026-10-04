@@ -45,9 +45,12 @@ def require_member(db: Session, room: Room, user) -> RoomPlayer:
         raise HTTPException(status_code=403, detail="You haven't joined this room.")
     return member
 
+def get_player_id(db:Session,username):
+    return db.query(Player).filter(Player.player_name == username).first()
+
 
 @room_router.post('/rooms')
-def create_room(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+def create_room(request : Request,db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     question_count = db.query(Question).count()
     if question_count < 3:
         raise HTTPException(status_code=400, detail="Not enough questions in the database to seed a match.")
@@ -59,13 +62,16 @@ def create_room(db: Session = Depends(get_db), current_user=Depends(get_current_
         raise HTTPException(status_code=400, detail="Could not pick 3 questions.")
 
     code = generate_unique_room_code()
+    player = get_player_id(db,username=current_user)
+
+    # handle if not user return no user found//
     while True:
         try:
-            new_room = Room(room_code=code, host_id=current_user.id, room_quizes=list_quest)
+            new_room = Room(room_code=code, host_id=player.id, room_quizes=list_quest)
             db.add(new_room)
             db.flush()  # gives new_room.id without committing yet
             # the host plays too, so the host needs a RoomPlayer row as well
-            db.add(RoomPlayer(room_id=new_room.id, player_id=current_user.id))
+            db.add(RoomPlayer(room_id=new_room.id, player_id=player.id))
             db.commit()
             break
         except IntegrityError as e:
@@ -77,6 +83,10 @@ def create_room(db: Session = Depends(get_db), current_user=Depends(get_current_
             raise
 
     return RedirectResponse(url=f"/rooms/{code}", status_code=303)
+    # return templates.TemplateResponse(request,'lobby.html',{
+    #     'request':request,
+    #     'room_code':code
+    # })
 
 
 @room_router.post('/rooms/{room_code}/players')
@@ -115,8 +125,10 @@ def view_lobby(
         .filter(RoomPlayer.room_id == room.id)
         .all()
     )
+    # fetch user 
+    player = get_player_id(db,username=current_user)
     players = [{"name": name, "is_host": pid == room.host_id} for name, pid in rows]
-    is_member = any(pid == current_user.id for _, pid in rows)
+    is_member = any(pid == player.id for _, pid in rows)
 
     # a member opening the link after the game began goes straight to the right page
     if is_member and room.room_state == 'in_progress':
@@ -128,7 +140,7 @@ def view_lobby(
         "request": request,
         "room_code": room.room_code,
         "players": players,
-        "is_host": room.host_id == current_user.id,
+        "is_host": room.host_id == player.id,
         "is_member": is_member,
     })
 
@@ -136,8 +148,9 @@ def view_lobby(
 @room_router.post('/rooms/{room_code}/start')
 def start_room(room_code: str, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     room = get_room_or_404(db, room_code)
-
-    if room.host_id != current_user.id:
+    # get player ID, name etc
+    player = get_player_id(db,username=current_user)
+    if room.host_id != player.id:
         raise HTTPException(status_code=403, detail="Only the host can start the game.")
     if room.room_state == 'in_progress':
         raise HTTPException(status_code=400, detail="Room already started.")
