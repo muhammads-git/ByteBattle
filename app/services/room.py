@@ -33,9 +33,9 @@ def get_room_or_404(db: Session, room_code: str) -> Room:
     return room
 
 
-def get_membership(db: Session, room: Room, user) -> RoomPlayer | None:
+def get_membership(db: Session, room: Room, user_id) -> RoomPlayer | None:
     return db.query(RoomPlayer).filter(
-        RoomPlayer.room_id == room.id, RoomPlayer.player_id == user.id
+        RoomPlayer.room_id == room.id, RoomPlayer.player_id == user_id
     ).first()
 
 
@@ -89,12 +89,14 @@ def create_room(request : Request,db: Session = Depends(get_db), current_user=De
     # })
 
 
-@room_router.post('/rooms/{room_code}/players')
-def join_room(room_code: str, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+@room_router.post('/rooms/players')
+def join_room(room_code: str= Form(...), db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     room = get_room_or_404(db, room_code)
-
+    # Get user -> user_id
+    user = db.query(Player).filter(Player.player_name == current_user).first()
+    user_id = user.id
     # re-clicking the link is not an error, just land in the lobby again
-    if get_membership(db, room, current_user):
+    if get_membership(db, room, user_id):
         return RedirectResponse(url=f"/rooms/{room_code}", status_code=303)
 
     if room.room_state == 'in_progress':
@@ -104,7 +106,7 @@ def join_room(room_code: str, db: Session = Depends(get_db), current_user=Depend
     if room.expires_at < datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="Room is expired.")
 
-    db.add(RoomPlayer(player_id=current_user.id, room_id=room.id))
+    db.add(RoomPlayer(player_id=user_id, room_id=room.id))
     db.commit()
 
     return RedirectResponse(url=f"/rooms/{room_code}", status_code=303)
