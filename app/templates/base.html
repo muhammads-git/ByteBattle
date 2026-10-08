@@ -5,6 +5,31 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>{% block title %}ByteBattle{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
+  
+  <!-- Global Authentication Interceptor Script for Silent Refresh -->
+  <script>
+    async function secureFetch(url, options = {}) {
+        let response = await fetch(url, options);
+
+        // Catch the 401 Authentication Error when the Access Cookie expires
+        if (response.status === 401) {
+            console.warn("Access token expired. Detouring to refresh endpoint silently...");
+
+            // Silently ping your /auth/refresh endpoint.
+            const refreshResponse = await fetch('/auth/refresh', { method: 'POST' });
+
+            if (refreshResponse.ok) {
+                console.log("Tokens refreshed successfully! Retrying the original request...");
+                // Retry the exact original request with the fresh new access cookie
+                response = await fetch(url, options);
+            } else {
+                console.error("Refresh token is invalid or expired. Routing to login page.");
+                window.location.href = '/login';
+            }
+        }
+        return response;
+    }
+  </script>
 </head>
 <body>
   <div class="shell">
@@ -17,5 +42,48 @@
     </main>
   </div>
   {% block scripts %}{% endblock %}
+
+  <!-- ⚡ GLOBAL FORM INTERCEPTOR -->
+  <script>
+    document.addEventListener('submit', async function(e) {
+        const form = e.target;
+        
+        // Agar aap chahte hain ke normal login/logout page bypass na ho, toh unhe exclude kar sakte hain
+        if (form.action.includes('/login') || form.action.includes('/register')) {
+            return; 
+        }
+
+        // Standard form submission ko rokna taake page crash na ho
+        e.preventDefault();
+
+        const formData = new FormData(form);
+        
+        // Agar submit button ka koi apna naam ya value thi (jaise arena.html mein option_index)
+        if (e.submitter && e.submitter.name) {
+            formData.append(e.submitter.name, e.submitter.value);
+        }
+
+        try {
+            // Saare forms ab silently secureFetch se guzrein ge!
+            const response = await secureFetch(form.action || window.location.href, {
+                method: form.method || 'POST',
+                body: formData
+            });
+
+            if (response.ok) {
+                // Backend request kamyab hone ke baad, browser window ko refresh ya redirect karega 
+                if (response.redirected) {
+                    window.location.href = response.url;
+                } else {
+                    window.location.reload();
+                }
+            } else {
+                console.error("Form submission status failed:", response.status);
+            }
+        } catch (err) {
+            console.error("Global network error handling form:", err);
+        }
+    });
+  </script>
 </body>
 </html>

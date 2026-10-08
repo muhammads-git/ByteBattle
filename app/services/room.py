@@ -241,7 +241,7 @@ def submit_answer(
     player = (
         db.query(RoomPlayer)
         .filter(RoomPlayer.room_id == room.id, RoomPlayer.player_id == player.id)
-        .with_for_update()
+        .with_for_update() # with_for_update
         .first()
     )
     if not player:
