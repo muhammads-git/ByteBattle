@@ -151,7 +151,8 @@ def view_lobby(
 def start_room(room_code: str, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     room = get_room_or_404(db, room_code)
     # get player ID, name etc
-    player = get_player_id(db,username=current_user)
+    player = get_player_id(db,current_user)
+    
     if room.host_id != player.id:
         raise HTTPException(status_code=403, detail="Only the host can start the game.")
     if room.room_state == 'in_progress':
@@ -177,8 +178,10 @@ def play_arena(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    
+    player = get_player_id(db,current_user)
     room = get_room_or_404(db, room_code)
-    member = require_member(db, room, current_user)
+    member = require_member(db, room, player.id)
 
     if room.room_state == 'waiting':
         return RedirectResponse(url=f"/rooms/{room_code}", status_code=303)
@@ -223,6 +226,7 @@ def submit_answer(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    player = get_player_id(db,current_user)
     room = get_room_or_404(db, room_code)
     if room.room_state != 'in_progress':
         raise HTTPException(status_code=400, detail="Room is not in progress.")
@@ -236,7 +240,7 @@ def submit_answer(
     # row lock: a double-click cannot add the score twice
     player = (
         db.query(RoomPlayer)
-        .filter(RoomPlayer.room_id == room.id, RoomPlayer.player_id == current_user.id)
+        .filter(RoomPlayer.room_id == room.id, RoomPlayer.player_id == player.id)
         .with_for_update()
         .first()
     )
