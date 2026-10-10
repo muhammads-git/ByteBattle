@@ -160,12 +160,12 @@ def get_refresh_token(request:Request,response:Response,db:Session=Depends(get_d
     #fetrch the refresh token from httpOnly
     http_only_refresh_token = request.cookies.get('refresh_token')
     if not http_only_refresh_token:
-        raise HTTPException(status_code='401',detail='Session has expired, please login again.')
+        raise HTTPException(status_code=401,detail='Session has expired, please login again.')
         
     # fetch the refresh token from db 
     db_refresh_token = db.query(RefreshToken).filter(RefreshToken.token == http_only_refresh_token).first()
     if not db_refresh_token:
-        raise HTTPException(status_code='401',detail='Invalid session token')
+        raise HTTPException(status_code=401,detail='Invalid session token')
     
     # if is_revoked, means token is stolen... Terminate all the sessions related this user...
     if db_refresh_token.is_revoked:
