@@ -270,9 +270,10 @@ def room_scores(
     room_code: str,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
-):
+):  
+    player = db.query(Player).filter(Player.player_name == current_user).first()
     room = get_room_or_404(db, room_code)
-    require_member(db, room, current_user)
+    require_member(db, room, player.id)
 
     if room.room_state != 'ended':
         return RedirectResponse(url=f"/rooms/{room_code}/play", status_code=303)
@@ -285,11 +286,11 @@ def room_scores(
         .all()
     )
     players = [
-        {"name": name, "score": rp.score, "is_you": rp.player_id == current_user.id}
+        {"name": name, "score": rp.score, "is_you": rp.player_id == player.id}
         for rp, name in rows
     ]
 
-    return templates.TemplateResponse(request, "room_scores.html", {
+    return templates.TemplateResponse(request, "room_score.html", {
         "request": request,
         "room_code": room_code,
         "players": players,

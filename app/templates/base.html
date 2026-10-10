@@ -43,12 +43,12 @@
   </div>
   {% block scripts %}{% endblock %}
 
-  <!-- ⚡ GLOBAL FORM INTERCEPTOR -->
+  <!-- GLOBAL FORM INTERCEPTOR -->
   <script>
     document.addEventListener('submit', async function(e) {
         const form = e.target;
         
-        // Agar aap chahte hain ke normal login/logout page bypass na ho, toh unhe exclude kar sakte hain
+        // Exclde logins endpoints 
         if (form.action.includes('/login') || form.action.includes('/register')) {
             return; 
         }
