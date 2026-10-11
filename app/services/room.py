@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
+from pydantic import HttpUrl
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -299,3 +300,17 @@ def room_scores(
         "room_code": room_code,
         "players": players,
     })
+
+# time
+@room_router.get('/rooms/{room_code}/time')
+def get_time_left(room_code : str,db:Session=Depends(get_db),current_user=Depends(get_current_user)):
+    """
+    get the timer
+
+    """
+    room = db.query(Room).filter(Room.room_code == room_code).first()
+    if not room:
+        raise HTTPException(status_code=404, detail='Room not found.')
+    
+    question_started_time = room.current_question_started_at
+    elapsed = datetime.now(timezone.utc) - question_started_time.total_seconds()
