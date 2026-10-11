@@ -21,6 +21,8 @@ QUESTION_SECONDS = 15
 room_router = APIRouter(dependencies=[Depends(get_current_user)])
 
 
+# helper functions
+
 def generate_unique_room_code(length=6):
     chars_digits = string.ascii_uppercase + string.digits
     return ''.join(random.choices(chars_digits, k=length))
@@ -48,6 +50,8 @@ def require_member(db: Session, room: Room, user) -> RoomPlayer:
 def get_player_id(db:Session,username):
     return db.query(Player).filter(Player.player_name == username).first()
 
+
+##################### routesss rooms
 
 @room_router.post('/rooms')
 def create_room(request : Request,db: Session = Depends(get_db), current_user=Depends(get_current_user)):
@@ -208,7 +212,7 @@ def play_arena(
         'question_number': room.current_question_index + 1,
         'total_questions': len(room.room_quizes),
         'question_index': room.current_question_index,
-        'code_snippet': question.question,
+        'code_snippet': question.question, # question
         'options': question.options,
         'seconds_left': seconds_left,
         'total_seconds': QUESTION_SECONDS,
@@ -247,8 +251,8 @@ def submit_answer(
     if not player:
         raise HTTPException(status_code=403, detail="You haven't joined this room.")
 
-    if player.last_answered_index == room.current_question_index:
-        return RedirectResponse(url=play_url, status_code=303)
+    if player.last_answered_index == room.current_question_index: # ?
+        return RedirectResponse(url=play_url, status_code=303)    
 
     question = db.query(Question).filter(
         Question.id == room.room_quizes[room.current_question_index]

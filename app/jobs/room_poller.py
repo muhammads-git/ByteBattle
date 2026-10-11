@@ -27,7 +27,7 @@ def advance_rooms_questions():
             # increment the curr ques index
             room.current_question_index += 1
             # reset the curr ques timer to now
-            room.current_question_started_at = datetime.utcnow()
+            room.current_question_started_at = datetime.now(timezone.utc)  # the line crashed the whole arena.html and skipped questions..huh!
    # commit the changes 
    db.commit()
 

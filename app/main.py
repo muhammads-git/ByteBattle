@@ -39,3 +39,4 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
         'request': request,
         'error': 'Please check your details — one of the fields isn\'t in the right format.'
     })
+

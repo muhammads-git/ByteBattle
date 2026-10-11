@@ -24,7 +24,7 @@
                 response = await fetch(url, options);
             } else {
                 console.error("Refresh token is invalid or expired. Routing to login page.");
-                window.location.href = '/login';
+                window.location.href = '/auth/login';
             }
         }
         return response;

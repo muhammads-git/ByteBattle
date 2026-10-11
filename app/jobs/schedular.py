@@ -5,7 +5,7 @@ from app.jobs.room_poller import advance_rooms_questions
 schedular = BackgroundScheduler()
 
 # setup the functions and intervals
-schedular.add_job(advance_rooms_questions,'interval',seconds=3)
+schedular.add_job(advance_rooms_questions,'interval',seconds=1)
 
 # start
 def start_schedular():

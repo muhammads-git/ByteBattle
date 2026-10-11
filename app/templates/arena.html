@@ -2,11 +2,11 @@
 {% block title %}Question {{ question_number }} — ByteBattle{% endblock %}
 
 {#
-  Context this template expects (new ones marked *):
+  Context this template expects:
     question_number, total_questions, answered_count, total_players,
     seconds_left (>= 0), total_seconds, code_snippet, options, room_code,
-    question_index*     -> room.current_question_index
-    already_answered*   -> player.last_answered_index == room.current_question_index
+    question_index     -> room.current_question_index
+    already_answered   -> player.last_answered_index == room.current_question_index
 #}
 
 {% block header_right %}
@@ -29,7 +29,7 @@
       <p style="margin: 0 auto;">Waiting for the next question&hellip;</p>
     </div>
   {% else %}
-    <form method="post" action="/rooms/{{ room_code }}/answer">
+    <form id="answer-form" method="post" action="/rooms/{{ room_code }}/answer">
       <input type="hidden" name="question_index" value="{{ question_index }}">
       <div class="options-grid">
         {% for option in options %}
@@ -45,27 +45,58 @@
 
 {% block scripts %}
 <script>
-  // The ring is only visual; the server clock decides when a round ends.
-  // When it hits zero we reload so the server can show the next question,
-  // or redirect to the scores page if the room has ended. The 3.5s wait is
-  // longer than the 3s background job, so the room has had time to advance.
   (function () {
     const ring = document.getElementById('timer-ring');
     let secondsLeft = Number(ring.dataset.secondsLeft);
     const totalSeconds = Number(ring.dataset.totalSeconds);
     const label = document.getElementById('timer-value');
 
-    const tick = setInterval(() => {
+    // Double reload ko hardware level par lock karne ke liye flag
+    window.isPageReloading = false;
+
+    // Timer Interval Logic
+    window.arenaTickInterval = setInterval(() => {
       secondsLeft -= 1;
+      
       if (secondsLeft <= 0) {
-        clearInterval(tick);
         secondsLeft = 0;
-        setTimeout(() => location.reload(), 3500);
       }
+
+      // Pehle UI aur percentage circle ko completely update karein (Taki 0 update miss na ho)
       label.textContent = secondsLeft;
       ring.style.setProperty('--pct', secondsLeft / totalSeconds);
       ring.classList.toggle('urgent', secondsLeft <= 5);
+
+      // Jab counter complete zero ho jaye tab validation handle karein
+      if (secondsLeft === 0) {
+        clearInterval(window.arenaTickInterval);
+        
+        // Agar pehle hi form submit hone ki wajah se page reload ho raha hai, toh automatic timeout block ho jaye
+        if (!window.isPageReloading) {
+            window.isPageReloading = true;
+            console.log("Timer hit zero naturally. Syncing with backend room manager...");
+            setTimeout(() => {
+                location.reload();
+            }, 3500);
+        }
+      }
     }, 1000);
+
+    // Form submission processing security lock
+    const answerForm = document.getElementById('answer-form');
+    if (answerForm) {
+      answerForm.addEventListener('submit', function() {
+          console.log("Answer submitted! Disabling all automatic visual timers.");
+          
+          // 1. Clear countdown execution explicitly
+          if (window.arenaTickInterval) {
+              clearInterval(window.arenaTickInterval);
+          }
+          
+          // 2. Set the global lock flag to True so that zero timeout can never fire concurrently
+          window.isPageReloading = true;
+      });
+    }
   })();
 </script>
 {% endblock %}
