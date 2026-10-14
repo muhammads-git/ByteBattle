@@ -16,6 +16,7 @@
             console.warn("Access token expired. Detouring to refresh endpoint silently...");
 
             // Silently ping your /auth/refresh endpoint.
+            // calling refresh to generate new tokens (silently)
             const refreshResponse = await fetch('/auth/refresh', { method: 'POST' });
 
             if (refreshResponse.ok) {

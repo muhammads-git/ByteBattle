@@ -331,7 +331,7 @@ def get_time_left(room_code : str,db:Session=Depends(get_db),current_user=Depend
 
 # leaderboard
 @room_router.get('/leaderboard')
-def leaderboard(db:Session=Depends(get_db),current_user=Depends(get_current_user)):
+def leaderboard(request:Request,db:Session=Depends(get_db),current_user=Depends(get_current_user)):
     """
         fetch players scores from db.... 
         # hard query
@@ -359,4 +359,7 @@ def leaderboard(db:Session=Depends(get_db),current_user=Depends(get_current_user
     )
 
     print(rows)
-    return {'success': True}
+    return templates.TemplateResponse(request,"leaderboard.html",{
+        'rows':rows,
+        'request':request
+    })

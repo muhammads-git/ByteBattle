@@ -157,6 +157,8 @@ def get_refresh_token(request:Request,response:Response,db:Session=Depends(get_d
                 access
     return both to where they need to be, for the same rotations.. and valdiations...
     """
+    # fetch the access token from httpOnly
+    http_only_access_token = request.cookies.get('access_token')
     #fetrch the refresh token from httpOnly
     http_only_refresh_token = request.cookies.get('refresh_token')
     if not http_only_refresh_token:
@@ -169,18 +171,23 @@ def get_refresh_token(request:Request,response:Response,db:Session=Depends(get_d
     
     # if is_revoked, means token is stolen... Terminate all the sessions related this user...
     if db_refresh_token.is_revoked:
-        # somthin gis wrong
+        # somthing is wrong token is already USED so this can be compormised TOKEN,.. terminate all //
         db.query(RefreshToken).filter(RefreshToken.player_id == db_refresh_token.player_id).update({'is_revoked':True})
         # db.commit()
         raise HTTPException(status_code=401,detail='Security Alert! All sessions are terminated.')
 
     # check if token expired by time
-    if db_refresh_token.expires_at > datetime.now(timezone.utc):
+    if db_refresh_token.expires_at < datetime.now(timezone.utc):
         raise HTTPException(status_code=401,detail='Session has expired, please login again.')
 
     try:
         # fetch username from decoding the token
-        payload = jwt.decode(http_only_refresh_token,os.getenv('SECRET_KEY'),os.getenv('JWT_ALGORITHM'))
+        payload = jwt.decode(
+            http_only_access_token,
+            os.getenv('SECRET_KEY'),
+            os.getenv('JWT_ALGORITHM'),
+            options={"verify_exp":False})
+        
         player_name = payload.get('sub')
         # create fresh access and refresh token
         fresh_access = createAccessToken({'sub':player_name})
@@ -214,7 +221,7 @@ def get_refresh_token(request:Request,response:Response,db:Session=Depends(get_d
         value=fresh_refresh, 
         httponly=True, 
         samesite="lax", 
-        path="/auths/refresh",
+        path="/auth/refresh",
         secure=False,
         max_age=604800       # 7 days fresh countdown (in seconds)
         )
