@@ -47,54 +47,77 @@
 <script>
   (function () {
     const ring = document.getElementById('timer-ring');
-    let secondsLeft = Number(ring.dataset.secondsLeft);
-    const totalSeconds = Number(ring.dataset.totalSeconds);
+    const totalSeconds = Number(ring.dataset.totalSeconds) || 15;
     const label = document.getElementById('timer-value');
+    
+    // Server variables se matching state hold karne ke liye template variables
+    const localQuestionIndex = Number("{{ question_index }}");
+    const roomCode = "{{ room_code }}";
 
-    // Double reload ko hardware level par lock karne ke liye flag
+    // Hard locking state to prevent duplicate simultaneous reloads/submits
     window.isPageReloading = false;
 
-    // Timer Interval Logic
-    window.arenaTickInterval = setInterval(() => {
-      secondsLeft -= 1;
-      
-      if (secondsLeft <= 0) {
-        secondsLeft = 0;
-      }
+    async function syncWithServerClock() {
+      // Return immediately if the interface thread is executing a page swap sequence
+      if (window.isPageReloading) return;
 
-      // Pehle UI aur percentage circle ko completely update karein (Taki 0 update miss na ho)
-      label.textContent = secondsLeft;
-      ring.style.setProperty('--pct', secondsLeft / totalSeconds);
-      ring.classList.toggle('urgent', secondsLeft <= 5);
-
-      // Jab counter complete zero ho jaye tab validation handle karein
-      if (secondsLeft === 0) {
-        clearInterval(window.arenaTickInterval);
+      try {
+        // Har 1 second baad controller route se bacha hua time aur absolute index fetch karo
+        const response = await secureFetch(`/rooms/${roomCode}/time`);
         
-        // Agar pehle hi form submit hone ki wajah se page reload ho raha hai, toh automatic timeout block ho jaye
-        if (!window.isPageReloading) {
-            window.isPageReloading = true;
-            console.log("Timer hit zero naturally. Syncing with backend room manager...");
-            setTimeout(() => {
-                location.reload();
-            }, 3500);
-        }
-      }
-    }, 1000);
+        if (!response.ok) return;
+        
+        const data = await response.json();
+        const serverTimeLeft = Number(data.time_left);
+        const serverQuestionIndex = Number(data.current_question_index);
 
-    // Form submission processing security lock
+        // --- CONDITION 1: Server schedular next question par ja chuka hai ---
+        if (serverQuestionIndex !== localQuestionIndex) {
+          window.isPageReloading = true;
+          clearInterval(window.arenaSyncInterval);
+          console.log("Server state increment detected. Forcing clean display layout refresh.");
+          window.location.reload();
+          return;
+        }
+
+        // --- REAL TIME UI CALCULATION & RENDERING ---
+        label.textContent = serverTimeLeft;
+        ring.style.setProperty('--pct', serverTimeLeft / totalSeconds);
+        ring.classList.toggle('urgent', serverTimeLeft <= 5);
+
+        // --- CONDITION 2: Server timeline execution drops naturally to 0 ---
+        if (serverTimeLeft === 0) {
+          window.isPageReloading = true;
+          clearInterval(window.arenaSyncInterval);
+          console.log("Countdown hit zero on database level. Preparing interface transition sync...");
+          
+          // 3.5 seconds waiting buffer for the backend room poller scheduler thread to securely commit operations
+          setTimeout(() => {
+            window.location.reload();
+          }, 3500);
+        }
+
+      } catch (err) {
+        console.error("Critical clock polling execution cycle failure:", err);
+      }
+    }
+
+    // Initialize synchronization loop processor engine (Runs strictly every 1000 milliseconds)
+    window.arenaSyncInterval = setInterval(syncWithServerClock, 1000);
+    
+    // Call immediately upon local document initialization sequence
+    syncWithServerClock();
+
+    // Secure submission interceptor logic to prevent dual submission collisions (+2 indices skips)
     const answerForm = document.getElementById('answer-form');
     if (answerForm) {
       answerForm.addEventListener('submit', function() {
-          console.log("Answer submitted! Disabling all automatic visual timers.");
-          
-          // 1. Clear countdown execution explicitly
-          if (window.arenaTickInterval) {
-              clearInterval(window.arenaTickInterval);
-          }
-          
-          // 2. Set the global lock flag to True so that zero timeout can never fire concurrently
-          window.isPageReloading = true;
+        console.log("User option selected. Immediately terminating interval engine processes.");
+        
+        if (window.arenaSyncInterval) {
+          clearInterval(window.arenaSyncInterval);
+        }
+        window.isPageReloading = true;
       });
     }
   })();

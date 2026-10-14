@@ -240,7 +240,8 @@ def submit_answer(
 
     # stale submit: the round moved on while the player was answering
     if question_index != room.current_question_index:
-        return RedirectResponse(url=play_url, status_code=303)
+        return RedirectResponse(url=play_url, status_code=303) # if the indexes dont match force request to this again to get the new fresh question
+    
 
     # row lock: a double-click cannot add the score twice
     player = (
@@ -311,6 +312,32 @@ def get_time_left(room_code : str,db:Session=Depends(get_db),current_user=Depend
     room = db.query(Room).filter(Room.room_code == room_code).first()
     if not room:
         raise HTTPException(status_code=404, detail='Room not found.')
-    
+
+    # index 
+    current_question_index = room.current_question_index
     question_started_time = room.current_question_started_at
-    elapsed = datetime.now(timezone.utc) - question_started_time.total_seconds()
+    elapsed = (datetime.now(timezone.utc) - question_started_time).total_seconds()
+
+    time_left = max(0,15 - int(elapsed))
+
+    return {
+        'time_left': time_left,
+        'current_question_index':current_question_index,
+        'room_state':room.room_state
+    }
+
+
+
+# leaderboard
+@room_router.get('/rooms/leaderboard')
+def leaderboard(db:Session=Depends(get_db),current_user=Depends(get_current_user)):
+    """
+        fetch players scores from db.... 
+        # hard query
+        select rp.score,p.name, from room_players rp 
+        JOIN players p 
+        ON rp.players_id = p.id
+        ORDER BY rp.scores desc
+        LIMIT 20;
+    """
+    pass
