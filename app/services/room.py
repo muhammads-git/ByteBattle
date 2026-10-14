@@ -7,6 +7,7 @@ from fastapi.responses import RedirectResponse
 from pydantic import HttpUrl
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from app.auths.jwt import get_current_user
 from app.database import get_db
@@ -329,7 +330,7 @@ def get_time_left(room_code : str,db:Session=Depends(get_db),current_user=Depend
 
 
 # leaderboard
-@room_router.get('/rooms/leaderboard')
+@room_router.get('/leaderboard')
 def leaderboard(db:Session=Depends(get_db),current_user=Depends(get_current_user)):
     """
         fetch players scores from db.... 
@@ -340,4 +341,22 @@ def leaderboard(db:Session=Depends(get_db),current_user=Depends(get_current_user
         ORDER BY rp.scores desc
         LIMIT 20;
     """
-    pass
+    
+
+    rows = (
+        db.query(
+            Player.id,
+            Player.player_name,
+            func.sum(RoomPlayer.score).label('total_score'),
+        )
+        .join(RoomPlayer, RoomPlayer.player_id == Player.id)
+        .join(Room, RoomPlayer.room_id == Room.id)
+        .filter(Room.room_state == 'ended')
+        .group_by(Player.id, Player.player_name)
+        .order_by(func.sum(RoomPlayer.score).desc(), Player.player_name)
+        .limit(20)
+        .all()
+    )
+
+    print(rows)
+    return {'success': True}
