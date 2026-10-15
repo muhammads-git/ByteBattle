@@ -2,54 +2,67 @@
 {% block title %}Leaderboard — ByteBattle{% endblock %}
 {% block main_class %}center-col{% endblock %}
 
+{#
+  Context this template expects:
+    players          rows ordered highest first; each has .id, .player_name, .total_score
+    current_user_id  int, used to highlight the viewer
+  The top three and the rest are sliced here, so no splitting is needed in Python.
+#}
+
 {% block content %}
-  <div class="eyebrow-plain">Room {{ room_code }}</div>
+  <link rel="stylesheet" href="{{ url_for('static', path='leaderboard.css') }}">
+
+  <div class="eyebrow-plain">All time &middot; finished games</div>
   <h1>Leaderboard</h1>
 
-  {% if top_three|length > 0 %}
-  <div class="podium">
-    {% if top_three|length > 1 %}
-    <div class="podium-slot second">
-      <div class="avatar-ring">{{ top_three[1].name[0]|upper }}</div>
-      <div class="p-name">{{ top_three[1].name }}</div>
-      <div class="p-score">{{ top_three[1].score }} pts</div>
-      <div class="stand">2</div>
-    </div>
-    {% endif %}
+  {% set top = players[:3] %}
+  {% set rest = players[3:] %}
 
-    <div class="podium-slot first">
-      <div class="avatar-ring">{{ top_three[0].name[0]|upper }}</div>
-      <div class="p-name">{{ top_three[0].name }}</div>
-      <div class="p-score">{{ top_three[0].score }} pts</div>
-      <div class="stand">1</div>
+  {% if not players %}
+    <div class="panel" style="width: 100%; max-width: 480px; text-align: center; margin-top: 1.5rem;">
+      <h3 style="margin-bottom: 0.3rem;">Nobody's on the board yet</h3>
+      <p style="margin: 0 auto;">Finish a game and your score lands here.</p>
+    </div>
+  {% else %}
+
+    <div class="lb-podium" role="list">
+      {% for p in top %}
+      {% set you = (p.id == current_user_id) %}
+      <div class="lb-spot place-{{ loop.index }}" role="listitem">
+        {% if loop.first %}
+        <svg class="lb-crown" viewBox="0 0 40 28" aria-hidden="true">
+          <path d="M3 24 L7 6 L15 15 L20 3 L25 15 L33 6 L37 24 Z" fill="var(--marker)" stroke="var(--board-deep)" stroke-width="1.5" stroke-linejoin="round"/>
+          <rect x="3" y="24" width="34" height="3" rx="1.5" fill="var(--marker)"/>
+        </svg>
+        {% endif %}
+        <div class="lb-avatar">{{ p.player_name[0]|upper }}</div>
+        <div class="lb-name">{{ p.player_name }}{% if you %} <span class="lb-you-pill">You</span>{% endif %}</div>
+        <div class="lb-pts">{{ p.total_score }} pts</div>
+        <div class="lb-stand"><span>{{ loop.index }}</span></div>
+      </div>
+      {% endfor %}
     </div>
 
-    {% if top_three|length > 2 %}
-    <div class="podium-slot third">
-      <div class="avatar-ring">{{ top_three[2].name[0]|upper }}</div>
-      <div class="p-name">{{ top_three[2].name }}</div>
-      <div class="p-score">{{ top_three[2].score }} pts</div>
-      <div class="stand">3</div>
-    </div>
-    {% endif %}
-  </div>
+    <section class="lb-sheet" aria-label="Rankings">
+      <ol class="lb-list">
+        {% for p in rest %}
+        {% set you = (p.id == current_user_id) %}
+        <li class="lb-row{% if you %} is-you{% endif %}">
+          <span class="lb-rank">{{ loop.index + 3 }}</span>
+          <span class="lb-mini-avatar">{{ p.player_name[0]|upper }}</span>
+          <span class="lb-row-name">{{ p.player_name }}</span>
+          {% if you %}<span class="lb-you-pill">You</span>{% endif %}
+          <span class="lb-row-pts">{{ p.total_score }}<small> pts</small></span>
+        </li>
+        {% else %}
+        <li class="lb-empty">That's everyone for now.</li>
+        {% endfor %}
+      </ol>
+    </section>
+
   {% endif %}
 
-  <div class="panel" style="width: 100%; max-width: 480px; text-align: left;">
-    <ul class="rank-list">
-      {% for player in rest %}
-      <li class="rank-row {% if player.is_you %}you{% endif %}">
-        <span class="rank-num">{{ loop.index + 3 }}</span>
-        <span class="rank-name">{{ player.name }}{% if player.is_you %} (you){% endif %}</span>
-        <span class="rank-score">{{ player.score }} pts</span>
-      </li>
-      {% else %}
-      <li style="color: var(--chalk-dim); padding: 0.85rem 0.3rem;">That's everyone.</li>
-      {% endfor %}
-    </ul>
-  </div>
-
   <div class="result-actions">
-    <a href="/rooms/new" class="btn btn-primary">Start a new room</a>
+    <a href="/home" class="btn btn-primary">Back to home</a>
   </div>
 {% endblock %}

@@ -1,0 +1,184 @@
+/* ByteBattle leaderboard — loads after style.css and uses its tokens */
+
+:root {
+  --silver: #C5CEC8;
+  --bronze: #D49A6A;
+}
+
+/* ---------- podium ---------- */
+
+.lb-podium {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 480px;
+  margin: 1.75rem auto 0;
+}
+
+.lb-spot {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  animation: lb-fade 0.5s ease both;
+  animation-delay: var(--d);
+}
+.place-1 { order: 2; --ring: var(--marker); --d: 0.55s; }
+.place-2 { order: 1; --ring: var(--silver); --d: 0.3s; }
+.place-3 { order: 3; --ring: var(--bronze); --d: 0.1s; }
+
+.lb-crown { width: 36px; height: 26px; margin-bottom: -2px; }
+
+.lb-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--board-deep);
+  border: 3px solid var(--ring);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.3rem;
+  margin-bottom: 0.55rem;
+}
+.place-1 .lb-avatar {
+  width: 76px;
+  height: 76px;
+  font-size: 1.7rem;
+  box-shadow: 0 0 0 6px rgba(244, 196, 48, 0.14);
+}
+
+.lb-name {
+  max-width: 100%;
+  font-weight: 600;
+  font-size: 0.95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lb-pts {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--ring);
+  margin-top: 0.1rem;
+}
+
+.lb-stand {
+  width: 100%;
+  margin-top: 0.8rem;
+  overflow: hidden;
+  border-radius: 10px 10px 0 0;
+  border: 2px solid var(--slate-line);
+  border-bottom: none;
+  background: var(--slate);
+  color: var(--chalk);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 0.5rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.5rem;
+  animation: lb-rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: var(--d);
+}
+.place-1 .lb-stand { --h: 112px; height: 112px; background: var(--marker); border-color: var(--marker); color: var(--board-deep); }
+.place-2 .lb-stand { --h: 80px; height: 80px; border-top: 3px solid var(--silver); }
+.place-3 .lb-stand { --h: 64px; height: 64px; border-top: 3px solid var(--bronze); }
+
+@keyframes lb-rise { from { height: 0; } to { height: var(--h); } }
+@keyframes lb-fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ---------- ranked sheet ---------- */
+
+.lb-sheet {
+  width: 100%;
+  max-width: 480px;
+  background: var(--slate);
+  border: 2px solid var(--slate-line);
+  border-radius: var(--radius-soft);
+  padding: 0.5rem 0.9rem;
+}
+.lb-list { list-style: none; margin: 0; padding: 0; }
+
+.lb-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.75rem 0.35rem;
+  border-bottom: 1px solid var(--slate-line);
+}
+.lb-row:last-child { border-bottom: none; }
+
+.lb-rank {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 2px solid var(--slate-line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--chalk-dim);
+}
+.lb-mini-avatar {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--board-deep);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+.lb-row-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lb-row-pts { font-family: var(--font-mono); color: var(--marker); white-space: nowrap; }
+.lb-row-pts small { color: var(--chalk-dim); font-size: 0.75rem; }
+
+.lb-row.is-you {
+  background: rgba(244, 196, 48, 0.1);
+  border-radius: 12px;
+  border-bottom-color: transparent;
+}
+.lb-row.is-you .lb-rank { border-color: var(--marker); color: var(--marker); }
+
+.lb-you-pill {
+  display: inline-block;
+  background: var(--marker);
+  color: var(--board-deep);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  vertical-align: middle;
+}
+
+.lb-empty { padding: 1.2rem 0.4rem; color: var(--chalk-dim); text-align: center; }
+
+@media (max-width: 380px) {
+  .lb-podium { gap: 0.5rem; }
+  .lb-name { font-size: 0.85rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lb-spot, .lb-stand { animation: none; }
+}

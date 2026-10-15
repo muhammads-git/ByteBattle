@@ -117,7 +117,7 @@ def login(request:Request,
     httponly=True,
     samesite="lax", # protect against csrf attacks any requets GET?POST
     secure=False,
-    path="/auths/refresh", #  Only sends this cookie when hitting the refresh endpoint!
+    path="/auth/refresh", #  Only sends this cookie when hitting the refresh endpoint!
     max_age=604800        # 7 days in seconds
     )
 

@@ -341,7 +341,7 @@ def leaderboard(request:Request,db:Session=Depends(get_db),current_user=Depends(
         ORDER BY rp.scores desc
         LIMIT 20;
     """
-    
+    user = db.query(Player).filter(Player.player_name == current_user).first()
 
     rows = (
         db.query(
@@ -360,6 +360,7 @@ def leaderboard(request:Request,db:Session=Depends(get_db),current_user=Depends(
 
     print(rows)
     return templates.TemplateResponse(request,"leaderboard.html",{
-        'rows':rows,
+        'players':rows,
+        'current_user_id':user.id,
         'request':request
     })

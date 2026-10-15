@@ -46,45 +46,60 @@
 
   <!-- GLOBAL FORM INTERCEPTOR -->
   <script>
+    async function secureFetch(url, options = {}) {
+        let response = await fetch(url, options);
+
+        if (response.status === 401) {
+            console.warn("Access token expired. Detouring to refresh endpoint silently...");
+
+            // 1. Aligned perfectly with your app.include_router(auths_router, prefix='/auth')
+            const refreshResponse = await fetch('/auth/refresh', { method: 'POST' });
+
+            if (refreshResponse.ok) {
+                console.log("Tokens refreshed successfully! Retrying original request...");
+                response = await fetch(url, options);
+            } else {
+                console.error("Refresh token invalid. Routing to login interface.");
+                // 2. Route to your actual exposed GET login page endpoint
+                window.location.href = '/auth/login-page'; 
+            }
+        }
+        return response;
+    }
+
     document.addEventListener('submit', async function(e) {
         const form = e.target;
         
-        // Exclde logins endpoints 
+        // Ensure credential submissions hit standard processing behaviors bypassing interceptors
         if (form.action.includes('/login') || form.action.includes('/register')) {
             return; 
         }
 
-        // Standard form submission ko rokna taake page crash na ho
         e.preventDefault();
-
         const formData = new FormData(form);
         
-        // Agar submit button ka koi apna naam ya value thi (jaise arena.html mein option_index)
         if (e.submitter && e.submitter.name) {
             formData.append(e.submitter.name, e.submitter.value);
         }
 
         try {
-            // Saare forms ab silently secureFetch se guzrein ge!
             const response = await secureFetch(form.action || window.location.href, {
                 method: form.method || 'POST',
                 body: formData
             });
 
             if (response.ok) {
-                // Backend request kamyab hone ke baad, browser window ko refresh ya redirect karega 
                 if (response.redirected) {
                     window.location.href = response.url;
                 } else {
                     window.location.reload();
                 }
-            } else {
-                console.error("Form submission status failed:", response.status);
             }
         } catch (err) {
-            console.error("Global network error handling form:", err);
+            console.error("Form handling network error:", err);
         }
     });
   </script>
+
 </body>
 </html>
