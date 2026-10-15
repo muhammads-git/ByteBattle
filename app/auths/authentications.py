@@ -121,6 +121,16 @@ def login(request:Request,
     max_age=604800        # 7 days in seconds
     )
 
+    # save refres token to db
+    new_refresh_token = RefreshToken(
+        player_id=player.id,
+        token=refresh_token,
+        expires_at=datetime.now(timezone.utc) + timedelta(days=7)
+    )
+    # add
+    db.add(new_refresh_token)
+    db.commit()
+
     # Return the configured response object
     return response
 
@@ -141,93 +151,134 @@ def login_page(request: Request):
     })
 
 
-
-##### refresh tokennnn..  request
 @auths_router.post('/refresh')
-def get_refresh_token(request:Request,response:Response,db:Session=Depends(get_db)):
-    """
-    fetch the refresh token from httpOnly and db where user is this.
-    match both
-    check if the refreh of db revoked=False and == to httpOnly
+def refresh(request: Request, response: Response, db: Session = Depends(get_db)):
+    token = request.cookies.get('refresh_token')
+    if not token:
+        raise HTTPException(status_code=401, detail='refresh: no cookie')
+
+    row = db.query(RefreshToken).filter(RefreshToken.token == token).first()
+    if not row:
+        raise HTTPException(status_code=401, detail='refresh: unknown token')
+
+    if row.is_revoked:
+        # a revoked token used again may have been stolen
+        db.query(RefreshToken).filter(RefreshToken.player_id == row.player_id).update({'is_revoked': True})
+        db.commit()   # without this the revocation is rolled back
+        raise HTTPException(status_code=401, detail='refresh: reuse detected, all sessions ended')
+
+    if row.expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=401, detail='refresh: expired')
+
+    player = db.query(Player).filter(Player.id == row.player_id).first()
+    if not player:
+        raise HTTPException(status_code=401, detail='refresh: no such player')
+
+    fresh_access = createAccessToken({'sub':player.player_name})
+    fresh_refresh = getRefreshToken({'sub': player.player_name})
+
+    row.is_revoked = True
+    db.add(RefreshToken(
+        player_id=player.id,
+        token=fresh_refresh,
+        expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+    ))
+    db.commit()
+
+    response.set_cookie(key='access_token', value=fresh_access, httponly=True,
+                        samesite='lax', secure=False, max_age=1800)
+    response.set_cookie(key='refresh_token', value=fresh_refresh, httponly=True,
+                        samesite='lax', secure=False, path='/auth/refresh', max_age=604800)
+    return {'status': 'success'}
+
+# ##### refresh tokennnn..  request
+# @auths_router.post('/refresh')
+# def get_refresh_token(request:Request,response:Response,db:Session=Depends(get_db)):
+#     """
+#     fetch the refresh token from httpOnly and db where user is this.
+#     match both
+#     check if the refreh of db revoked=False and == to httpOnly
     
-    then:
-        revoked=True old refresh expired..
-        create:
-                refresh
-                access
-    return both to where they need to be, for the same rotations.. and valdiations...
-    """
-    # fetch the access token from httpOnly
-    http_only_access_token = request.cookies.get('access_token')
-    #fetrch the refresh token from httpOnly
-    http_only_refresh_token = request.cookies.get('refresh_token')
-    if not http_only_refresh_token:
-        raise HTTPException(status_code=401,detail='Session has expired, please login again.')
-        
-    # fetch the refresh token from db 
-    db_refresh_token = db.query(RefreshToken).filter(RefreshToken.token == http_only_refresh_token).first()
-    if not db_refresh_token:
-        raise HTTPException(status_code=401,detail='Invalid session token')
+#     then:
+#         revoked=True old refresh expired..
+#         create:
+#                 refresh
+#                 access
+#     return both to where they need to be, for the same rotations.. and valdiations...
+#     """
+#     # fetch the access token from httpOnly
+#     http_only_access_token = request.cookies.get('access_token')
+#     #fetrch the refresh token from httpOnly
+#     http_only_refresh_token = request.cookies.get('refresh_token')
+
+#     if not http_only_refresh_token:
+#         raise HTTPException(status_code=401,detail='Session has expired, please login again.')
+#     print(f'REFRESH TOKEN COOKIE:',http_only_refresh_token)
+
+#     # fetch the refresh token from db 
+#     db_refresh_token = db.query(RefreshToken).filter(RefreshToken.token == http_only_refresh_token).first()
+#     if not db_refresh_token:
+#         raise HTTPException(status_code=401,detail='The refresh token is not found in db.')
     
-    # if is_revoked, means token is stolen... Terminate all the sessions related this user...
-    if db_refresh_token.is_revoked:
-        # somthing is wrong token is already USED so this can be compormised TOKEN,.. terminate all //
-        db.query(RefreshToken).filter(RefreshToken.player_id == db_refresh_token.player_id).update({'is_revoked':True})
-        # db.commit()
-        raise HTTPException(status_code=401,detail='Security Alert! All sessions are terminated.')
+#     # if is_revoked, means token is stolen... Terminate all the sessions related this user...
+#     if db_refresh_token.is_revoked:
+#         # somthing is wrong token is already USED so this can be compormised TOKEN,.. terminate all //
+#         db.query(RefreshToken).filter(RefreshToken.player_id == db_refresh_token.player_id).update({'is_revoked':True})
+#         # db.commit()
+#         raise HTTPException(status_code=401,detail='Security Alert! All sessions are terminated.')
 
-    # check if token expired by time
-    if db_refresh_token.expires_at < datetime.now(timezone.utc):
-        raise HTTPException(status_code=401,detail='Session has expired, please login again.')
+#     # check if token expired by time
+#     if db_refresh_token.expires_at < datetime.now(timezone.utc):
+#         raise HTTPException(status_code=401,detail='Session has expired, please login again.')
 
-    try:
-        # fetch username from decoding the token
-        payload = jwt.decode(
-            http_only_access_token,
-            os.getenv('SECRET_KEY'),
-            os.getenv('JWT_ALGORITHM'),
-            options={"verify_exp":False})
+#     try:
+#         # fetch username from decoding the token
+#         payload = jwt.decode(
+#             http_only_access_token,
+#             os.getenv('SECRET_KEY'),
+#             os.getenv('JWT_ALGORITHM'),
+#             options={"verify_exp":False})
         
-        player_name = payload.get('sub')
-        # create fresh access and refresh token
-        fresh_access = createAccessToken({'sub':player_name})
-        fresh_refresh = getRefreshToken({'sub':player_name})
+#         player_name = payload.get('sub')
+#         # create fresh access and refresh token
+#         fresh_access = createAccessToken({'sub':player_name})
+#         fresh_refresh = getRefreshToken({'sub':player_name})
 
-        # // revok the OLD refrsh token in database
-        db_refresh_token.is_revoked = True
+#         # // revok the OLD refrsh token in database
+#         db_refresh_token.is_revoked = True
         
-        # insert new refresh token in db
-        new_refresh_token = RefreshToken(
-            player_id=db_refresh_token.player_id,
-            token=fresh_refresh,
-            expire_at=datetime.now(timezone.utc) + timedelta(days=7)
-        )
-        db.add(new_refresh_token)
-        db.commit()
+#         # insert new refresh token in db
+#         new_refresh_token = RefreshToken(
+#             player_id=db_refresh_token.player_id,
+#             token=fresh_refresh,
+#             expire_at=datetime.now(timezone.utc) + timedelta(days=7)
+#         )
+#         db.add(new_refresh_token)
+#         db.commit()
 
 
-        # Return both fresh tokens to the browser by overwriting the cookies completely
-        response.set_cookie(
-        key="access_token", 
-        value=fresh_access, 
-        httponly=True, 
-        samesite="lax",
-        secure=False,
-        max_age=1800          # 15 minutes fresh countdown (in seconds)
-        )
+#         # Return both fresh tokens to the browser by overwriting the cookies completely
+#         response.set_cookie(
+#         key="access_token", 
+#         value=fresh_access, 
+#         httponly=True, 
+#         samesite="lax",
+#         secure=False,
+#         max_age=1800          # 15 minutes fresh countdown (in seconds)
+#         )
 
-        response.set_cookie(
-        key="refresh_token", 
-        value=fresh_refresh, 
-        httponly=True, 
-        samesite="lax", 
-        path="/auth/refresh",
-        secure=False,
-        max_age=604800       # 7 days fresh countdown (in seconds)
-        )
+#         response.set_cookie(
+#         key="refresh_token", 
+#         value=fresh_refresh, 
+#         httponly=True, 
+#         samesite="lax", 
+#         path="/auth/refresh",
+#         secure=False,
+#         max_age=604800       # 7 days fresh countdown (in seconds)
+#         )
 
-        return {"status": "success", "message": "Tokens rotated successfully"}
+#         return {"status": "success", "message": "Tokens rotated successfully"}
 
 
-    except jwt.JWTError:
-        raise HTTPException(status_code=401, detail="Invalid token signature.")
+#     except jwt.PyJWKError:
+#         raise HTTPException(status_code=401, detail="Invalid token signature.")

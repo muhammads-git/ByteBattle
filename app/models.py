@@ -59,7 +59,7 @@ class RefreshToken(Base):
    id = Column(Integer,primary_key=True,autoincrement=True)
    token = Column(String,unique=True,nullable=False)
    is_revoked =Column(Boolean,default=False,nullable=False)
-   expires_at = Column(DateTime,nullable=False)
+   expires_at = Column(DateTime(timezone=True),nullable=False)
 
    # users.id
    player_id = Column(Integer,ForeignKey('players.id'),nullable=False)

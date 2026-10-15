@@ -126,19 +126,40 @@ def view_lobby(
     current_user=Depends(get_current_user),
 ):
     room = get_room_or_404(db, room_code)
+    player = get_player_id(db, username=current_user)
 
+    # 1. Check if this player is already inside the room
+    membership = get_membership(db, room, player.id)
+
+    # 2. AUTO-ENROLLMENT GUARD: If they are NOT a member, sign them up right now!
+    if not membership:
+        # Prevent players from joining if the match is already running or expired
+        if room.room_state == 'in_progress':
+            raise HTTPException(status_code=400, detail="Cannot join via link. Game already started.")
+        if room.room_state == 'ended':
+            raise HTTPException(status_code=400, detail="This room has already ended.")
+        if room.expires_at < datetime.now(timezone.utc):
+            raise HTTPException(status_code=400, detail="This room link has expired.")
+
+        # Insert them into the RoomPlayer mapping bridge
+        db.add(RoomPlayer(player_id=player.id, room_id=room.id))
+        db.commit()
+        print(f"Player {player.player_name} successfully auto-enrolled via shared link.")
+
+    # 3. NOW FETCH THE ROWS (Includes the new player perfectly!)
     rows = (
         db.query(Player.player_name, Player.id)
         .join(RoomPlayer, RoomPlayer.player_id == Player.id)
         .filter(RoomPlayer.room_id == room.id)
         .all()
     )
-    # fetch user 
-    player = get_player_id(db,username=current_user)
+
     players = [{"name": name, "is_host": pid == room.host_id} for name, pid in rows]
+    
+    # Since we handled auto-enrollment up top, this will naturally be True now
     is_member = any(pid == player.id for _, pid in rows)
 
-    # a member opening the link after the game began goes straight to the right page
+    # Redirect states for returning members if the room moved forward
     if is_member and room.room_state == 'in_progress':
         return RedirectResponse(url=f"/rooms/{room_code}/play", status_code=303)
     if is_member and room.room_state == 'ended':
@@ -357,8 +378,6 @@ def leaderboard(request:Request,db:Session=Depends(get_db),current_user=Depends(
         .limit(20)
         .all()
     )
-
-    print(rows)
     return templates.TemplateResponse(request,"leaderboard.html",{
         'players':rows,
         'current_user_id':user.id,
