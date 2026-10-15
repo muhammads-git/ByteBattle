@@ -189,7 +189,14 @@ def refresh(request: Request, response: Response, db: Session = Depends(get_db))
                         samesite='lax', secure=False, max_age=1800)
     response.set_cookie(key='refresh_token', value=fresh_refresh, httponly=True,
                         samesite='lax', secure=False, path='/auth/refresh', max_age=604800)
-    return {'status': 'success'}
+    
+    return {'status': 'success', 'message': 'Token rotated successfully!'}
+
+
+
+
+
+
 
 # ##### refresh tokennnn..  request
 # @auths_router.post('/refresh')

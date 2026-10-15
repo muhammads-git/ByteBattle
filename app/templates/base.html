@@ -16,16 +16,17 @@
             console.warn("Access token expired. Detouring to refresh endpoint silently...");
 
             // Silently ping your /auth/refresh endpoint.
-            // calling refresh to generate new tokens (silently)
+            // Aligned perfectly with your app.include_router(auths_router, prefix='/auth')
             const refreshResponse = await fetch('/auth/refresh', { method: 'POST' });
 
             if (refreshResponse.ok) {
-                console.log("Tokens refreshed successfully! Retrying the original request...");
+                console.log("Tokens refreshed successfully! Retrying original request...");
                 // Retry the exact original request with the fresh new access cookie
                 response = await fetch(url, options);
             } else {
-                console.error("Refresh token is invalid or expired. Routing to login page.");
-                window.location.href = '/auth/login';
+                console.error("Refresh token invalid. Routing to login interface.");
+                // Route to your actual exposed GET login page endpoint
+                window.location.href = '/auth/login-page'; 
             }
         }
         return response;
@@ -35,7 +36,7 @@
 <body>
   <div class="shell">
     <header class="topbar">
-      <a href="/" class="brand">Byte<span>Battle</span></a>
+      <a href="/home" class="brand">Byte<span>Battle</span></a>
       {% block header_right %}{% endblock %}
     </header>
     <main class="main {% block main_class %}{% endblock %}">
@@ -44,29 +45,43 @@
   </div>
   {% block scripts %}{% endblock %}
 
-  <!-- GLOBAL FORM INTERCEPTOR -->
+  <!-- GLOBAL FORM & NAVIGATION CLICK INTERCEPTORS -->
   <script>
-    async function secureFetch(url, options = {}) {
-        let response = await fetch(url, options);
-
-        if (response.status === 401) {
-            console.warn("Access token expired. Detouring to refresh endpoint silently...");
-
-            // 1. Aligned perfectly with your app.include_router(auths_router, prefix='/auth')
-            const refreshResponse = await fetch('/auth/refresh', { method: 'POST' });
-
-            if (refreshResponse.ok) {
-                console.log("Tokens refreshed successfully! Retrying original request...");
-                response = await fetch(url, options);
-            } else {
-                console.error("Refresh token invalid. Routing to login interface.");
-                // 2. Route to your actual exposed GET login page endpoint
-                window.location.href = '/auth/login-page'; 
-            }
+    // 1. GLOBAL LINK INTERCEPTOR: Protects standard anchor navigation links (e.g., Leaderboard)
+    document.addEventListener('click', async function(e) {
+        // Find if the clicked element (or its parent) is a standard anchor link
+        const anchor = e.target.closest('a');
+        
+        // If it's not a link, or it's pointing to a different domain, let the browser handle it natively
+        if (!anchor || anchor.hostname !== window.location.hostname) return;
+        
+        // Skip intercepting explicit authentication routes to avoid circular loops
+        if (anchor.pathname.includes('/login') || anchor.pathname.includes('/register') || anchor.pathname.includes('/logout')) {
+            return;
         }
-        return response;
-    }
 
+        // 🛑 Stop the browser from performing a native, unprotected page shift
+        e.preventDefault();
+        
+        const targetUrl = anchor.href;
+        console.log(`Intercepting navigation to: ${targetUrl} via secureFetch shield.`);
+
+        try {
+            // Send a background GET check request. If it hits a 401, secureFetch will handle rotation automatically!
+            const response = await secureFetch(targetUrl, { method: 'GET' });
+
+            if (response.ok) {
+                // If tokens are active or successfully rotated, update page focus safely
+                window.location.href = targetUrl;
+            }
+        } catch (err) {
+            console.error("Global navigation shield failure:", err);
+            // Fallback recovery if something breaks completely
+            window.location.href = '/auth/login-page';
+        }
+    });
+
+    // 2. GLOBAL FORM INTERCEPTOR: Protects data submissions across views
     document.addEventListener('submit', async function(e) {
         const form = e.target;
         
