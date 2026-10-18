@@ -16,6 +16,7 @@ from app.engine import calculateScore
 from app.models import Player, Question, Room, RoomPlayer
 from app.templates_configs import templates
 
+# 15 seconds to each question answer time_
 QUESTION_SECONDS = 15
 
 # Router-level dependency manages the user context execution sequence safely
@@ -60,12 +61,12 @@ async def get_player_id(db: AsyncSession, username):
     return result.scalars().first()
 
 
-# 🎮 COROUTINE POST/GET ROUTES (Event loop never freezes on these)
+# COROUTINE POST/GET ROUTES (Event loop never freezes on these)
 
 @room_router.post('/rooms')
 async def create_room(request: Request, db: AsyncSession = Depends(get_db), current_user=Depends(get_current_user)):
     count_stmt = select(func.count(Question.id))
-    question_count = await db.scalar(count_stmt)
+    question_count =await db.scalar(count_stmt)  # count_stmt is INTEGER so using await with int is wrong syntactically.
     
     if question_count < 3:
         raise HTTPException(status_code=400, detail="Not enough questions in the database to seed a match.")
@@ -302,7 +303,6 @@ async def submit_answer(
 
     return RedirectResponse(url=play_url, status_code=303)
 
-
 @room_router.get('/rooms/{room_code}/scores')
 async def room_scores(
     request: Request,
@@ -310,11 +310,15 @@ async def room_scores(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):  
-    player = await db.query(Player).filter(Player.player_name == current_user).first()
-    # Using explicit mapping fallback:
+    # 1. FIXED: Removed the synchronous db.query legacy line entirely
     stmt_p = select(Player).filter(Player.player_name == current_user)
     res_p = await db.execute(stmt_p)
     player = res_p.scalars().first()
+    
+    # Ensure player exists before checking properties
+    if not player:
+        # Handle unregistered user context appropriately
+        return RedirectResponse(url="/login", status_code=303)
     
     room = await get_room_or_404(db, room_code)
     await require_member(db, room, player.id)
@@ -341,7 +345,6 @@ async def room_scores(
         "room_code": room_code,
         "players": players,
     })
-
 
 @room_router.get('/rooms/{room_code}/time')
 async def get_time_left(room_code: str, db: AsyncSession = Depends(get_db), current_user=Depends(get_current_user)):

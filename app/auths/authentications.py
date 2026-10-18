@@ -1,189 +1,189 @@
-from fastapi import APIRouter,Depends,Form,Request,Response,HTTPException
+from fastapi import APIRouter, Depends, Form, Request, Response, HTTPException
 from fastapi.responses import RedirectResponse
 from typing import Annotated
-from app.models import *
+from app.models import StudentRegistry, Player, RefreshToken
 from app.database import get_db
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from sqlalchemy import update
 from app.services.room import templates
 from app.security import PasswordManager
-from app.auths.jwt import createAccessToken,getRefreshToken,get_current_user
+from app.auths.jwt import createAccessToken, getRefreshToken, get_current_user
+from datetime import datetime, timezone, timedelta
 import os
 import jwt
 from dotenv import load_dotenv
 
 load_dotenv()
 
-
 auths_router = APIRouter()
 
 
 @auths_router.post('/register')
-def register(request:Request,
-    db: Session = Depends(get_db),
+async def register(request: Request,
+    db: AsyncSession = Depends(get_db),
     username: Annotated[
         str, 
         Form(
             ..., 
             min_length=3, 
             max_length=20, 
-            pattern=r"^[a-zA-Z0-9_]+$", # Only allows alphanumeric characters and underscores
+            pattern=r"^[a-zA-Z0-9_]+$", 
             description="The user's unique login username"
         )
     ] = None,
     roll_no: Annotated[str, Form(...)] = None,
     password: Annotated[str, Form(...)] = None
 ):
-    # Your authentication logic goes here
-    # check in the db that if roll_no exists in db...
-    # and not registered
+    # Fetch StudentRegistry using async select
+    stmt = select(StudentRegistry).filter(StudentRegistry.roll_no == roll_no)
+    res = await db.execute(stmt)
+    registered = res.scalars().first()
 
-
-    registered = db.query(StudentRegistry).filter(StudentRegistry.roll_no == roll_no).first()
     if not registered:
-        # return 
-        return templates.TemplateResponse(request, 'signup.html',{
-            'request':request,
-            'error':'This Roll No is not registered in Unviersity.'
-        })
-    if registered.is_registered:
-        return templates.TemplateResponse(request, 'signup.html',{
+        return templates.TemplateResponse(request, 'signup.html', {
             'request': request,
-            'error':'An account is already linked to this Roll No.'
+            'error': 'This Roll No is not registered in University.'
+        })
+        
+    if registered.is_registered:
+        return templates.TemplateResponse(request, 'signup.html', {
+            'request': request,
+            'error': 'An account is already linked to this Roll No.'
         })
 
-    # hash the password
     hash_password = PasswordManager.hash_Pass(password)
-    # insert data into Players and is_registered == True
+    
     new_player = Player(
-        player_name = username,
-        roll_no = roll_no,
-        password_hash = hash_password # hashed_password
-
+        player_name=username,
+        roll_no=roll_no,
+        password_hash=hash_password
     )
     db.add(new_player)
 
-    # Student_registry  -> True
     registered.is_registered = True
-    # atomic commit
-    db.commit()
+    await db.commit()
 
-    # redirect to login until session management isnt implemented
-    return RedirectResponse(url=f"/login", status_code=303)
+    return RedirectResponse(url="/login", status_code=303)
+
 
 @auths_router.post('/login')
-def login(request:Request,
-    db: Session = Depends(get_db),
+async def login(request: Request,
+    db: AsyncSession = Depends(get_db),
     roll_no: Annotated[str, Form(...)] = None,
     password: Annotated[str, Form(...)] = None
 ):
+    # Fetch player using async select
+    stmt = select(Player).filter(Player.roll_no == roll_no)
+    res = await db.execute(stmt)
+    player = res.scalars().first()
 
-    player = db.query(Player).filter(Player.roll_no == roll_no).first()
     if not player:
-        return templates.TemplateResponse(request,'signup.html',{
-            'request':request,
-            'error':'Player not found.'
+        return templates.TemplateResponse(request, 'signup.html', {
+            'request': request,
+            'error': 'Player not found.'
         })
-    # check passs
-    if not PasswordManager.verifyPassword(password,player.password_hash):
-        return templates.TemplateResponse(request,'signup.html',{
-            'request':request,
-            'error':'Invalid Password.'
+        
+    if not PasswordManager.verifyPassword(password, player.password_hash):
+        return templates.TemplateResponse(request, 'signup.html', {
+            'request': request,
+            'error': 'Invalid Password.'
         })
 
-    # login success
-    # create/return  jwt token
-    access_token = createAccessToken({'sub':player.player_name})
-    # create/return refresh_token
-    refresh_token = getRefreshToken({'sub':player.player_name})
+    access_token = createAccessToken({'sub': player.player_name})
+    refresh_token = getRefreshToken({'sub': player.player_name})
 
-    #creaste response obj
-    response = RedirectResponse(url=f"/home", status_code=303)
+    response = RedirectResponse(url="/home", status_code=303)
 
-
-    # Set the short-lived Access Token Cookie
     response.set_cookie(
-    key="access_token",
-    value=access_token,
-    httponly=True,       # Prevents JavaScript from reading the token (XSS Protection)
-    samesite="lax",      # Protects against CSRF attacks for normal navigation
-    secure=False,        # Set to True in production (forces HTTPS only)
-    max_age=1800          # 30 minutes in seconds (expires automatically)
+        key="access_token",
+        value=access_token,
+        httponly=True,       
+        samesite="lax",      
+        secure=False,        
+        max_age=1800          
     )
 
-    #Set the long-lived Refresh Token Cookie
     response.set_cookie(
-    key="refresh_token",
-    value=refresh_token,
-    httponly=True,
-    samesite="lax", # protect against csrf attacks any requets GET?POST
-    secure=False,
-    path="/auth/refresh", #  Only sends this cookie when hitting the refresh endpoint!
-    max_age=604800        # 7 days in seconds
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        samesite="lax", 
+        secure=False,
+        path="/auth/refresh", 
+        max_age=604800        
     )
 
-    # save refres token to db
     new_refresh_token = RefreshToken(
         player_id=player.id,
         token=refresh_token,
         expires_at=datetime.now(timezone.utc) + timedelta(days=7)
     )
-    # add
     db.add(new_refresh_token)
-    db.commit()
+    await db.commit()
 
-    # Return the configured response object
     return response
 
 
-
-    # GET
 @auths_router.get('/register-page')
-def register_page(request: Request):
+async def register_page(request: Request):
     return templates.TemplateResponse(request, 'signup.html', {
         'request': request
     })
 
 
 @auths_router.get('/login-page')
-def login_page(request: Request):
+async def login_page(request: Request):
     return templates.TemplateResponse(request, 'login.html', {
         'request': request
     })
 
 
 @auths_router.post('/refresh')
-def refresh(request: Request, response: Response, db: Session = Depends(get_db)):
+async def refresh(request: Request, response: Response, db: AsyncSession = Depends(get_db)):
     token = request.cookies.get('refresh_token')
     if not token:
         raise HTTPException(status_code=401, detail='refresh: no cookie')
 
-    row = db.query(RefreshToken).filter(RefreshToken.token == token).first()
+    stmt = select(RefreshToken).filter(RefreshToken.token == token)
+    res = await db.execute(stmt)
+    row = res.scalars().first()
+
     if not row:
         raise HTTPException(status_code=401, detail='refresh: unknown token')
 
     if row.is_revoked:
-        # a revoked token used again may have been stolen
-        db.query(RefreshToken).filter(RefreshToken.player_id == row.player_id).update({'is_revoked': True})
-        db.commit()   # without this the revocation is rolled back
+        # Secure execution option using an explicit update statement query
+        upd_stmt = (
+            update(RefreshToken)
+            .filter(RefreshToken.player_id == row.player_id)
+            .values(is_revoked=True)
+        )
+        await db.execute(upd_stmt)
+        await db.commit()   
         raise HTTPException(status_code=401, detail='refresh: reuse detected, all sessions ended')
 
-    if row.expires_at < datetime.now(timezone.utc):
+    if row.expires_at.replace(tzinfo=timezone.utc) if row.expires_at.tzinfo is None else row.expires_at < datetime.now(timezone.utc):
         raise HTTPException(status_code=401, detail='refresh: expired')
 
-    player = db.query(Player).filter(Player.id == row.player_id).first()
+    player_stmt = select(Player).filter(Player.id == row.player_id)
+    player_res = await db.execute(player_stmt)
+    player = player_res.scalars().first()
+    
     if not player:
         raise HTTPException(status_code=401, detail='refresh: no such player')
 
-    fresh_access = createAccessToken({'sub':player.player_name})
+    fresh_access = createAccessToken({'sub': player.player_name})
     fresh_refresh = getRefreshToken({'sub': player.player_name})
 
     row.is_revoked = True
+    
     db.add(RefreshToken(
         player_id=player.id,
         token=fresh_refresh,
         expires_at=datetime.now(timezone.utc) + timedelta(days=7),
     ))
-    db.commit()
+    await db.commit()
 
     response.set_cookie(key='access_token', value=fresh_access, httponly=True,
                         samesite='lax', secure=False, max_age=1800)
@@ -191,10 +191,6 @@ def refresh(request: Request, response: Response, db: Session = Depends(get_db))
                         samesite='lax', secure=False, path='/auth/refresh', max_age=604800)
     
     return {'status': 'success', 'message': 'Token rotated successfully!'}
-
-
-
-
 
 
 

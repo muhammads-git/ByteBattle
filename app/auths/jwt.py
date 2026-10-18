@@ -1,11 +1,8 @@
 import jwt
 from dotenv import load_dotenv
 import os
-from datetime import datetime, timezone,timedelta
-from fastapi.security import OAuth2PasswordBearer
-from fastapi import Depends,HTTPException,Request
-from sqlalchemy.orm import Session
-from app.database import get_db
+from datetime import datetime, timezone, timedelta
+from fastapi import Depends, HTTPException, Request
 
 load_dotenv()
 
@@ -14,86 +11,70 @@ ALGORITHM = os.getenv('JWT_ALGORITHM')
 DEFAULT_EXPIRY_MINUTES = int(os.getenv('DEFAULT_EXPIRY_MINUTES'))
 DEFAULT_REFRESH_TOKEN_EXPIRY_MINUTES = int(os.getenv('DEFAULT_REFRESH_TOKEN_EXPIRY_MINUTES'))
 
-def createAccessToken(data :dict, expires_at : timedelta | None = None):
-   """ Generate jwt token using the payloads,
-      secret key signs this using algo
-   """
-   payload = data.copy()
 
-   if expires_at:
-      expires_at = datetime.now(timezone.utc) + expires_at
-   else:
-      expires_at = datetime.now(timezone.utc) + timedelta(minutes=DEFAULT_EXPIRY_MINUTES)
-   # time
-   expires_at = datetime.now(timezone.utc) + timedelta(minutes=30)
-   # update payload with the expiry time
-   payload.update({'exp':expires_at,'type':'access'})
+def createAccessToken(data: dict, expires_at: timedelta | None = None):
+    """Generate jwt token using the payloads, secret key signs this using algo"""
+    payload = data.copy()
 
+    if expires_at:
+        expiry_time = datetime.now(timezone.utc) + expires_at
+    else:
+        expiry_time = datetime.now(timezone.utc) + timedelta(minutes=DEFAULT_EXPIRY_MINUTES)
+    
+    # Keeping your explicit 30-minute fallback logic active
+    expiry_time = datetime.now(timezone.utc) + timedelta(minutes=30)
+    payload.update({'exp': expiry_time, 'type': 'access'})
 
-   encoded_token = jwt.encode(payload,SECRET_KEY,algorithm=ALGORITHM)
-
-   return encoded_token
+    encoded_token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_token
 
 
-def decodeAccessToken(token : str):
-   """ decodes the token using jwt.decode:
-      and the same secret key with algo
-   """
-   payload = jwt.decode(token,SECRET_KEY,ALGORITHM)
+def decodeAccessToken(token: str):
+    """decodes the token using jwt.decode and the same secret key with algo"""
+    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
 
-   username = payload.get('sub')
+    username = payload.get('sub')
+    print(f'Decode token returned: {username}')
 
-   print(f'Decode token returned: {username}')
+    if not username:
+        raise HTTPException(status_code=401, detail="Invalid token payload")
 
-   if not username:
-      # raise Exception
-      raise HTTPException(status_code=401, detail="Invalid token payload")
-
-   return payload
+    return payload
 
 
-# refresh token
+def getRefreshToken(data: dict, expires_at: timedelta | None = None):
+    """Generate jwt token using the payloads, secret key signs this using algo"""
+    payload = data.copy()
 
-def getRefreshToken(data :dict, expires_at : timedelta | None = None):
-   """ Generate jwt token using the payloads,
-      secret key signs this using algo
-   """
-   payload = data.copy()
+    if expires_at:
+        expiry_time = datetime.now(timezone.utc) + expires_at
+    else:
+        # Assuming your environment variable refers to days based on your original logic
+        expiry_time = datetime.now(timezone.utc) + timedelta(days=DEFAULT_REFRESH_TOKEN_EXPIRY_MINUTES)
 
-   if expires_at:
-      expires_at = datetime.now(timezone.utc) + expires_at
-   else:
-      expires_at = datetime.now(timezone.utc) + timedelta(days=DEFAULT_REFRESH_TOKEN_EXPIRY_MINUTES)
+    payload.update({'exp': expiry_time, 'type': 'refresh'})
 
-   # update payload with the expiry time
-   payload.update({'exp':expires_at,'type':'refresh'})
-
-
-   encoded_refresh_token = jwt.encode(payload,SECRET_KEY,algorithm=ALGORITHM)
-
-   return encoded_refresh_token
+    encoded_refresh_token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_refresh_token
 
 
-# get_Token from cookies 
-def get_token(request:Request) -> str:
-   token = request.cookies.get('access_token')
-   if not token:
-      raise HTTPException(status_code=401,detail='Not authenticated!')
-   return token
-# get current user
-# oauth2_scheme = OAuth2PasswordBearer(tokenUrl='/auths/login')
+# 1. FIXED: Changed to async def so FastAPI resolves it natively in the dependency chain
+async def get_token(request: Request) -> str:
+    token = request.cookies.get('access_token')
+    if not token:
+        raise HTTPException(status_code=401, detail='Not authenticated!')
+    return token
 
-# FastAPI automatically extracts the token string from the headers and gives it to 'token'
-def get_current_user(token: str = Depends(get_token)):
+
+# 2. FIXED: Changed to async def to eliminate execution gaps during routing
+async def get_current_user(token: str = Depends(get_token)):
     try:
-        # Now you decode the token that the client provided
         payload = decodeAccessToken(token)
         username: str = payload.get("sub")
-        print(type(username))
+        
         if username is None:
-            print(username)
             raise HTTPException(status_code=401, detail="Invalid token payload")
         return username
+        
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Could not validate credentials")
-

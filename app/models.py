@@ -17,7 +17,7 @@ class Room(Base):
    __tablename__ = 'rooms'
    id = Column(Integer, primary_key=True, autoincrement=True)
    host_id = Column(Integer, ForeignKey('players.id'), nullable=False)
-   room_code = Column(String(255), nullable=False, unique=True)
+   room_code = Column(String(255), nullable=False, unique=True,index=True)
    room_quizes = Column(ARRAY(Integer), nullable=False)
    room_state = Column(String, default='waiting')
    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
@@ -29,8 +29,8 @@ class Room(Base):
 class RoomPlayer(Base):
    __tablename__ = 'room_players'
    id = Column(Integer, primary_key=True, autoincrement=True)
-   room_id = Column(Integer, ForeignKey('rooms.id'), nullable=False)
-   player_id = Column(Integer, ForeignKey('players.id'), nullable=False)
+   room_id = Column(Integer, ForeignKey('rooms.id'), nullable=False,index=True)
+   player_id = Column(Integer, ForeignKey('players.id'), nullable=False,index=True)
    score = Column(Integer, default=0, nullable=False)
    last_answered_index = Column(Integer, default=-1, server_default='-1', nullable=False)
    joined_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
@@ -42,7 +42,7 @@ class Player(Base):
    __tablename__ = 'players'
    id = Column(Integer, primary_key=True, autoincrement=True)
    player_name = Column(String(255), nullable=False, unique=True)
-   roll_no = Column(String(50),unique=True, nullable=False)
+   roll_no = Column(String(50),unique=True, nullable=False,index=True)
    password_hash = Column(String(255), nullable=False)
 
 class Question(Base):
