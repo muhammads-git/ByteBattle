@@ -3,7 +3,22 @@
 {% block main_class %}center-col{% endblock %}
 
 {% block content %}
-  <h1>What does this code print?</h1>
+  <link rel="stylesheet" href="{{ url_for('static', path='home.css') }}">
+
+  <div class="bg-field" aria-hidden="true">
+    <span class="snip">print(0.1 + 0.2)</span>
+    <span class="snip">[1, 2, 3][-1]</span>
+    <span class="snip">"ab" * 3</span>
+    <span class="snip">bool([])</span>
+    <span class="snip">2 ** 3 ** 2</span>
+    <span class="snip">type(1 / 2)</span>
+    <span class="pts">+47</span>
+    <span class="pts">+31</span>
+    <span class="pts">+50</span>
+    <span class="pts">+12</span>
+  </div>
+
+  <h1>What does this <span class="hl">code<svg viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true"><path d="M1 6 C 20 1, 45 9, 70 4 S 95 3, 99 5" stroke="var(--marker)" stroke-width="3" fill="none" stroke-linecap="round"/></svg></span> print?</h1>
   <p>A live quiz for your class. One code snippet, four guesses, whoever's fastest wins the round.</p>
 
   <div class="hero-cta-row">
@@ -14,6 +29,18 @@
       Join with a code
     </button>
     <a href="/leaderboard" class="btn btn-outline btn-lg">Leaderboard</a>
+  </div>
+
+  <div class="demo" aria-hidden="true">
+    <div class="demo-head"><i></i><i></i><i></i><span class="demo-live"><b></b>LIVE ROUND</span></div>
+    <pre class="demo-code">print(0.1 + 0.2 == 0.3)</pre>
+    <div class="demo-bar"><span></span></div>
+    <div class="demo-opts">
+      <span>A &nbsp;True</span>
+      <span class="right">B &nbsp;False</span>
+      <span>C &nbsp;Error</span>
+      <span>D &nbsp;None</span>
+    </div>
   </div>
 
   <div class="panel" id="join-panel" style="margin-top: 2.5rem; max-width: 380px; width: 100%;">

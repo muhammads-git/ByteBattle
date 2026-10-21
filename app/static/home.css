@@ -1,0 +1,92 @@
+
+
+/* ByteBattle home — loads after style.css. Pure CSS, no scripts. */
+
+.main { position: relative; z-index: 1; }
+
+@keyframes drift { 0%, 100% { transform: translateY(0) rotate(var(--r)); } 50% { transform: translateY(-22px) rotate(calc(var(--r) + 3deg)); } }
+@keyframes rise { 0% { transform: translateY(0); opacity: 0; } 15% { opacity: .9; } 100% { transform: translateY(-260px); opacity: 0; } }
+@keyframes drain { from { width: 100%; } to { width: 0; } }
+@keyframes reveal { 0%, 66% { border-color: var(--slate-line); background: var(--board-deep); } 72%, 94% { border-color: var(--correct); background: rgba(107,203,119,.18); transform: scale(1.04); } 100% { border-color: var(--slate-line); background: var(--board-deep); } }
+@keyframes dim { 0%, 66% { opacity: 1; } 72%, 94% { opacity: .35; } 100% { opacity: 1; } }
+@keyframes live { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+
+/* ---------- background layer ---------- */
+
+.bg-field {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden;
+  background-image:
+    linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+.snip {
+  position: absolute; --r: -4deg;
+  padding: .45rem .8rem; border-radius: 10px;
+  border: 2px solid var(--slate-line); background: rgba(24,36,32,.7);
+  font-family: var(--font-mono); font-size: .85rem; color: var(--chalk-dim);
+  opacity: .5; animation: drift 9s ease-in-out infinite; white-space: nowrap;
+}
+.snip:nth-child(1) { top: 9%;  left: 4%;  --r: -5deg; }
+.snip:nth-child(2) { top: 22%; right: 5%; --r: 4deg;  animation-delay: -2s; color: var(--marker); }
+.snip:nth-child(3) { top: 46%; left: 2%;  --r: 3deg;  animation-delay: -4s; }
+.snip:nth-child(4) { top: 58%; right: 3%; --r: -3deg; animation-delay: -1s; color: var(--coral); }
+.snip:nth-child(5) { top: 74%; left: 6%;  --r: -2deg; animation-delay: -5s; color: var(--correct); }
+.snip:nth-child(6) { top: 86%; right: 8%; --r: 5deg;  animation-delay: -3s; }
+
+.pts {
+  position: absolute; bottom: 8%; font-family: var(--font-display); font-weight: 700;
+  font-size: 1.4rem; color: var(--marker); animation: rise 7s ease-in infinite; opacity: 0;
+}
+.pts:nth-of-type(1) { left: 18%; animation-delay: 0s; }
+.pts:nth-of-type(2) { left: 46%; animation-delay: 2.4s; color: var(--correct); }
+.pts:nth-of-type(3) { left: 72%; animation-delay: 4.6s; }
+.pts:nth-of-type(4) { left: 88%; animation-delay: 1.2s; color: var(--coral); }
+
+/* ---------- hero ---------- */
+
+.hl { color: var(--marker); position: relative; white-space: nowrap; }
+.hl svg { position: absolute; left: 0; bottom: -8px; width: 100%; height: 10px; }
+
+.demo {
+  width: 100%; max-width: 420px; margin-top: 2rem; text-align: left;
+  background: var(--slate); border: 2px solid var(--slate-line); border-radius: var(--radius-soft);
+  padding: 0 0 1rem; overflow: hidden; transform: rotate(-1.2deg);
+}
+.demo-head {
+  display: flex; align-items: center; gap: .4rem; padding: .6rem .9rem;
+  border-bottom: 2px solid var(--slate-line); font-family: var(--font-mono); font-size: .75rem; color: var(--chalk-dim);
+}
+.demo-head i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.demo-head i:nth-child(1) { background: var(--coral); }
+.demo-head i:nth-child(2) { background: var(--marker); }
+.demo-head i:nth-child(3) { background: var(--correct); }
+.demo-live { margin-left: auto; color: var(--coral); font-weight: 700; letter-spacing: .08em; }
+.demo-live b { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--coral); margin-right: .35rem; animation: live 1.2s infinite; }
+.demo-code { margin: 0; padding: 1.1rem 1rem .8rem; font-family: var(--font-mono); font-size: 1.05rem; color: var(--chalk); }
+.demo-bar { height: 6px; margin: 0 1rem .9rem; border-radius: 99px; background: var(--slate-line); overflow: hidden; }
+.demo-bar span { display: block; height: 100%; background: var(--marker); border-radius: 99px; animation: drain 7s linear infinite; }
+.demo-opts { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; padding: 0 1rem; }
+.demo-opts span {
+  padding: .6rem .8rem; border-radius: 10px; border: 2px solid var(--slate-line); background: var(--board-deep);
+  font-family: var(--font-mono); font-size: .9rem; animation: dim 7s infinite;
+}
+.demo-opts .right { animation: reveal 7s infinite; }
+
+/* ---------- how it works ---------- */
+
+.how-it-works .step {
+  background: var(--slate); border: 2px solid var(--slate-line); border-radius: var(--radius-soft);
+  padding: 1.25rem; transition: transform .2s ease, border-color .2s ease;
+}
+.how-it-works .step:hover { transform: translateY(-4px) rotate(-.6deg); border-color: var(--marker); }
+
+@media (max-width: 640px) {
+  .snip:nth-child(n+4) { display: none; }
+  .demo { transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .snip, .pts, .demo-bar span, .demo-opts span, .demo-live b { animation: none !important; }
+  .pts { display: none; }
+}

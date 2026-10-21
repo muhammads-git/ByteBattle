@@ -206,6 +206,7 @@ async def play_arena(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    
     player = await get_player_id(db, current_user)
     room = await get_room_or_404(db, room_code)
     member = await require_member(db, room, player.id)
@@ -269,7 +270,7 @@ async def submit_answer(
     if question_index != room.current_question_index:
         return RedirectResponse(url=play_url, status_code=303)
     
-    # 💥 THE ROW LOCK REWRITE: 
+    # THE ROW LOCK REWRITE: 
     # Standard .with_for_update() must now be wrapped inside an awaited select statement.
     # While the DB holds this lock, the thread immediately yields control back to the event loop!
     lock_stmt = (
@@ -310,7 +311,7 @@ async def room_scores(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):  
-    # 1. FIXED: Removed the synchronous db.query legacy line entirely
+    #
     stmt_p = select(Player).filter(Player.player_name == current_user)
     res_p = await db.execute(stmt_p)
     player = res_p.scalars().first()
