@@ -374,7 +374,7 @@ async def leaderboard(request: Request, db: AsyncSession = Depends(get_db), curr
     user_result = await db.execute(user_stmt)
     user = user_result.scalars().first()
 
-    # 📊 THE HEAVY QUERY REWRITE: 
+    # THE HEAVY QUERY REWRITE: 
     # Executing the aggregate query asynchronously ensures that the event loop can juggle 
     # other player ticks while Postgres/MySQL performs sorting and grouping operations.
     leaderboard_stmt = (

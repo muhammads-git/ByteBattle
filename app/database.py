@@ -11,9 +11,9 @@ DATABASE_URL = os.getenv('DATABASE_URL')
 
 engine = create_async_engine(
     DATABASE_URL,
-    pool_size=50,          # Maintain up to 50 persistent open connections
-    max_overflow=100,      # Allow up to 100 extra burst connections under load
-    pool_timeout=10,       # Fail faster! Drop request if no DB connection in 10s (prevents 30s lockups)
+    pool_size=100,          # Maintain up to 50 persistent open connections
+    max_overflow=5,      # Allow up to 100 extra burst connections under load
+    pool_timeout=20,       # Fail faster! Drop request if no DB connection in 10s (prevents 30s lockups)
     pool_recycle=1800
 )
 
