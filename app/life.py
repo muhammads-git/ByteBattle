@@ -22,11 +22,12 @@ async def lifespan(app:FastAPI):
    )
    # store in the app.state
    app.state.redis = redis_client
+   
 
+   # schedular start
    start_schedular()
    yield
-
-
+   # schedular stpp
    stop_schedular()
 
    # stop redis

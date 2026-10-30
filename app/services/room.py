@@ -254,6 +254,7 @@ async def play_arena(
 
 @room_router.post('/rooms/{room_code}/answer')
 async def submit_answer(
+    request:Request,
     room_code: str,
     option_index: int = Form(...),
     question_index: int = Form(...),
@@ -302,6 +303,11 @@ async def submit_answer(
     # Non-blocking async commit context synchronization
     await db.commit()
 
+    # using redis ZADD for creating/updating the scoring...
+    redis = request.app.state.redis
+    member_key = member_key = f"{room_player.player_id}:{room_player.player_name}"
+    await redis.zadd(f"room:{room.id}:leaderboard,{member_key:room_player.score}")
+
     return RedirectResponse(url=play_url, status_code=303)
 
 @room_router.get('/rooms/{room_code}/scores')
@@ -347,6 +353,7 @@ async def room_scores(
         "players": players,
     })
 
+##### GET TIME LEFT
 @room_router.get('/rooms/{room_code}/time')
 async def get_time_left(room_code: str, db: AsyncSession = Depends(get_db), current_user=Depends(get_current_user)):
     stmt = select(Room).filter(Room.room_code == room_code)
