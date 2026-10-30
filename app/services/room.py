@@ -303,11 +303,19 @@ async def submit_answer(
     # Non-blocking async commit context synchronization
     await db.commit()
 
-    # using redis ZADD for creating/updating the scoring...
-    redis = request.app.state.redis
-    member_key = member_key = f"{room_player.player_id}:{room_player.player_name}"
-    await redis.zadd(f"room:{room.id}:leaderboard,{member_key:room_player.score}")
+    ############## REDIS ZADD ########################
+    # redis key
+    global_leaderboard_key = 'global:leaderboard'
 
+    # member key 
+    member_key = f'{room_player.id}:{room_player.player_name}'
+
+    # get redis client
+    redis = request.app.state.redis
+    # create/update zadd
+    await redis.zadd(global_leaderboard_key,{member_key:room_player.score})
+
+    # redirect
     return RedirectResponse(url=play_url, status_code=303)
 
 @room_router.get('/rooms/{room_code}/scores')
@@ -382,24 +390,44 @@ async def leaderboard(request: Request, db: AsyncSession = Depends(get_db), curr
     user_result = await db.execute(user_stmt)
     user = user_result.scalars().first()
 
-    # THE HEAVY QUERY REWRITE: 
-    # Executing the aggregate query asynchronously ensures that the event loop can juggle 
-    # other player ticks while Postgres/MySQL performs sorting and grouping operations.
-    leaderboard_stmt = (
-        select(
-            Player.id,
-            Player.player_name,
-            func.sum(RoomPlayer.score).label('total_score'),
-        )
-        .join(RoomPlayer, RoomPlayer.player_id == Player.id)
-        .join(Room, RoomPlayer.room_id == Room.id)
-        .filter(Room.room_state == 'ended')
-        .group_by(Player.id, Player.player_name)
-        .order_by(func.sum(RoomPlayer.score).desc(), Player.player_name)
-        .limit(20)
-    )
-    leaderboard_result = await db.execute(leaderboard_stmt)
-    rows = leaderboard_result.all()
+    # # THE HEAVY QUERY REWRITE: 
+    # # Executing the aggregate query asynchronously ensures that the event loop can juggle 
+    # # other player ticks while Postgres/MySQL performs sorting and grouping operations.
+    # leaderboard_stmt = (
+    #     select(
+    #         Player.id,
+    #         Player.player_name,
+    #         func.sum(RoomPlayer.score).label('total_score'),
+    #     )
+    #     .join(RoomPlayer, RoomPlayer.player_id == Player.id)
+    #     .join(Room, RoomPlayer.room_id == Room.id)
+    #     .filter(Room.room_state == 'ended')
+    #     .group_by(Player.id, Player.player_name)
+    #     .order_by(func.sum(RoomPlayer.score).desc(), Player.player_name)
+    #     .limit(20)
+    # )
+    # leaderboard_result = await db.execute(leaderboard_stmt)
+    # rows = leaderboard_result.all()
+
+    ## REDIS REVRANGE
+    redis_key = 'global:leaderboard'
+
+    redis = request.app.state.redis
+    raw_leaderboard = await redis.zrevrange(redis_key,0,19,withscores=True)
+
+    # as the return type is [(),()]
+    # and redis saves data as raw bytes we need to clean this out
+    rows = []
+    for member_bytes,score in raw_leaderboard:
+        player_id,player_name = member_bytes.split(':',1)
+
+        rows.append({
+        'id': int(player_id),
+        'player_name': player_name,
+        'total_score': int(score) # Casting to int keeps '150 pts' clean instead of '150.0 pts'
+        }) # Good to keep just in case you want to highlight the current user!
+
+        print(rows)
 
     return templates.TemplateResponse(request, "leaderboard.html", {
         'players': rows,
