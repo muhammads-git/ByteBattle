@@ -198,7 +198,7 @@ async def start_room(room_code: str, db: AsyncSession = Depends(get_db), current
     await db.commit()
 
     return RedirectResponse(url=f"/rooms/{room_code}/play", status_code=303)
-
+### PLAY  GET QUESTIONS, !!!!
 @room_router.get('/rooms/{room_code}/play')
 async def play_arena(
     request: Request,
@@ -300,6 +300,12 @@ async def submit_answer(
     room_player.score += calculateScore(time_taken, is_correct)
     room_player.last_answered_index = room.current_question_index
     
+    # Extract the values into local variables BEFORE committing
+    player_id = player_info.id
+    player_name = player_info.player_name
+    print("name",player_name)
+    current_score = room_player.score
+    
     # Non-blocking async commit context synchronization
     await db.commit()
 
@@ -308,12 +314,12 @@ async def submit_answer(
     global_leaderboard_key = 'global:leaderboard'
 
     # member key 
-    member_key = f'{room_player.id}:{room_player.player_name}'
+    member_key = f'{player_id}:{player_name}'
 
     # get redis client
     redis = request.app.state.redis
-    # create/update zadd
-    await redis.zadd(global_leaderboard_key,{member_key:room_player.score})
+    # create/update zincrby -> just increment to existing ID's
+    await redis.zincrby(global_leaderboard_key,current_score,str(player_id))
 
     # redirect
     return RedirectResponse(url=play_url, status_code=303)
@@ -413,21 +419,23 @@ async def leaderboard(request: Request, db: AsyncSession = Depends(get_db), curr
     redis_key = 'global:leaderboard'
 
     redis = request.app.state.redis
-    raw_leaderboard = await redis.zrevrange(redis_key,0,19,withscores=True)
-
-    # as the return type is [(),()]
+    # top 10
+    raw_leaderboard = await redis.zrevrange(redis_key,0,9,withscores=True)
+    # as the return type is [(123,1),(1245,2)]
     # and redis saves data as raw bytes we need to clean this out
+    player_id = [str(player_id) for player_id,score in raw_leaderboard]
+    # fetch the name of the player_id from REDIS HASHSET 
+    player_name = await redis.hmget('user:name',player_id)
+
+
     rows = []
-    for member_bytes,score in raw_leaderboard:
-        player_id,player_name = member_bytes.split(':',1)
-
+    for i,(player_id,score) in enumerate(raw_leaderboard):
         rows.append({
-        'id': int(player_id),
-        'player_name': player_name,
-        'total_score': int(score) # Casting to int keeps '150 pts' clean instead of '150.0 pts'
-        }) # Good to keep just in case you want to highlight the current user!
-
-        print(rows)
+            'id':str(player_id),
+            'player_name':player_name[i],
+            'total_score':int(score)
+        })
+    print(rows)
 
     return templates.TemplateResponse(request, "leaderboard.html", {
         'players': rows,

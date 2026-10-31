@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from app.jobs.schedular import start_schedular,stop_schedular
 from fastapi import FastAPI
-import redis.asyncio as aioredis 
+from redis.asyncio import Redis 
 from dotenv import load_dotenv
 import os
 
@@ -15,11 +15,15 @@ async def lifespan(app:FastAPI):
    print("Connecting to local Redis server...")
 
 
-   redis_client = aioredis.from_url(
-      os.getenv('REDIS_URL'),
-      decode_responses=True
+   # redis_client = aioredis.from_url(
+   #    os.getenv('REDIS_URL','redis://localhost:6379'),
+   #    decode_responses=True
    
-   )
+   # )
+
+   redis_client = await Redis(host="localhost",
+                  port=6379,
+                  decode_responses=True)
    # store in the app.state
    app.state.redis = redis_client
    

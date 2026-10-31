@@ -64,6 +64,8 @@ async def register(request: Request,
     registered.is_registered = True
     await db.commit()
 
+
+
     return RedirectResponse(url="/login", status_code=303)
 
 
@@ -120,6 +122,11 @@ async def login(request: Request,
         expires_at=datetime.now(timezone.utc) + timedelta(days=7)
     )
     db.add(new_refresh_token)
+
+        #### add ID:Name to REDIS HASHSET....
+    redis = request.app.state.redis
+    await redis.hset('user:name',str(player.id),player.player_name)
+
     await db.commit()
 
     return response
