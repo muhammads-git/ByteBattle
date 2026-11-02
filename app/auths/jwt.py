@@ -54,7 +54,7 @@ def getRefreshToken(data: dict, expires_at: timedelta | None = None):
 
     payload.update({'exp': expiry_time, 'type': 'refresh'})
 
-    encoded_refresh_token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    encoded_refresh_token = jwt.encode(payload, SECRET_KEY, algorithm=[ALGORITHM])
     return encoded_refresh_token
 
 
@@ -71,10 +71,12 @@ async def get_current_user(token: str = Depends(get_token)):
     try:
         payload = decodeAccessToken(token)
         username: str = payload.get("sub")
+        user_id : int = payload.get('user_id')
+
         
-        if username is None:
+        if username is None or user_id is None:
             raise HTTPException(status_code=401, detail="Invalid token payload")
-        return username
+        return payload
         
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Could not validate credentials")

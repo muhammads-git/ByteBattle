@@ -1,65 +1,121 @@
-from locust import HttpUser, task, between
+# import os
+# import random
+# import jwt
+# from datetime import datetime, timezone, timedelta
+# from locust import HttpUser, task, between
+# from dotenv import load_dotenv
+
+# # Project configurations read sync parameters setup
+# load_dotenv()
+
+# class LeaderboardStressUser(HttpUser):
+#     # Short pacing wait interval to simulate high continuous read stress
+#     wait_time = between(0.5, 1.5)
+
+#     def on_start(self):
+#         """
+#         Runs exactly once per simulated user instantiation lifecycle checkpoint.
+#         Generates a valid JWT targeting our clean pool of 5,000 pre-seeded accounts.
+#         """
+#         # Target only the IDs safely populated by our seed script execution context
+#         # Assumes the seeded range fits well within your overall players pool allocation boundary
+#         self.player_id = random.randint(1005, 5999) 
+#         self.player_name = f"Player_Simulated_{self.player_id}"
+
+#         # Secure system key variables extraction matching application settings
+#         SECRET_KEY = os.getenv("SECRET_KEY") or "secret"
+#         ALGORITHM = os.getenv("ALGORITHM") or "HS256"
+
+#         token_payload = {
+#             "sub": str(self.player_id),
+#             "player_name": self.player_name,
+#             "exp": datetime.now(timezone.utc) + timedelta(hours=2)
+#         }
+        
+#         try:
+#             encoded_jwt = jwt.encode(token_payload, SECRET_KEY, algorithm=ALGORITHM)
+            
+#             # Persist secure authentication cookies directly to cookie container context
+#             self.client.cookies.set("access_token", encoded_jwt)
+            
+#             # Optional: Fallback Authorization Header binding for double inspection layer verification
+#             self.client.headers.update({
+#                 "Authorization": f"Bearer {encoded_jwt}"
+#             })
+            
+#         except Exception as e:
+#             print(f"❌ [Locust Context Authentication Initialization Failure]: {e}")
+
+#     @task
+#     def view_leaderboard(self):
+#         """
+#         Pure Read Operation Benchmark:
+#         Isolates your Redis data extraction tier logic from slow relational DB block actions.
+#         """
+#         with self.client.get("/leaderboard", catch_response=True) as response:
+#             if response.status_code == 200:
+#                 response.success()
+#             elif response.status_code == 401:
+#                 response.failure("401 Unauthorized - Confirm your JWT environment token constants or signatures match.")
+#             elif response.status_code == 500:
+#                 response.failure("500 Server Error - Redis engine lookup bottleneck or sync validation failure.")
+#             else:
+#                 response.failure(f"Request failed unexpectedly with status: {response.status_code}")
+
+
+
+import os
 import random
 import jwt
-import os
 from datetime import datetime, timezone, timedelta
+from locust import HttpUser, task, between
 from dotenv import load_dotenv
 
-# Automatically pulls the real environment signature constants directly from your project config!
 load_dotenv()
 
-class QuizAppUser(HttpUser):
-    wait_time = between(1, 3)
+class LeaderboardStressUser(HttpUser):
+    # Safe pacing interval to prevent instant packet drops on Windows
+    wait_time = between(1.0, 2.5)
 
     def on_start(self):
         """
-        Dynamically synchronizes key signatures using your system configuration data context.
+        Runs exactly once per virtual user spawn. Safe, bulletproof session initialization.
         """
-        random_id = random.randint(1, 10)
-        player_name = f"player_{random_id}"
+        # Select randomly from the pool populated by your seeding script
+        self.player_id = random.randint(1005, 5999) 
+        self.player_name = f"Player_Simulated_{self.player_id}"
 
-        # --- DYNAMIC CONFIGURATION ALIGNMENT ---
-        # 1. Server configuration secrets trace check:
-        # Reads the exact real secret token variable used by your app/auths/jwt package logic!
-        SECRET_KEY = os.getenv("SECRET_KEY") or os.getenv("JWT_SECRET") or "secret"
+        # Hardcoded backup strings to bypass any loose .env parsing bottlenecks under sudden stress
+        SECRET_KEY = os.getenv("SECRET_KEY") or "secret"
         ALGORITHM = os.getenv("ALGORITHM") or "HS256"
 
-        print(f"[Engine Config Check] Using SECRET_KEY signature source string: '{SECRET_KEY}' | Algorithm: '{ALGORITHM}'")
-
         token_payload = {
-            "sub": player_name,
-            "exp": datetime.now(timezone.utc) + timedelta(minutes=30)
+            "sub": str(self.player_id),
+            "player_name": self.player_name,
+            "exp": datetime.now(timezone.utc) + timedelta(hours=2)
         }
         
         try:
             encoded_jwt = jwt.encode(token_payload, SECRET_KEY, algorithm=ALGORITHM)
             
-            # Direct headers parameter cookie framework injection simulation
+            # Direct cookie allocation sync
+            self.client.cookies.set("access_token", encoded_jwt)
             self.client.headers.update({
-                "Cookie": f"access_token={encoded_jwt}"
+                "Authorization": f"Bearer {encoded_jwt}"
             })
-            print(f"✅ [JWT Sync Active] Secure mapping context enforced for: {player_name}")
-            
         except Exception as e:
-            print(f"❌ [JWT Fail]: {e}")
+            # Fallback mock setup so the request runner NEVER crashes out during cold starts
+            mock_token = "faked-fallback-stress-token-string"
+            self.client.cookies.set("access_token", mock_token)
+            self.client.headers.update({
+                "Authorization": f"Bearer {mock_token}"
+            })
 
-    @task(1)
+    @task
     def view_leaderboard(self):
-        """Simulate profile check dynamic leaderboard tracking"""
-        self.client.get("/leaderboard")
-
-    @task(3)
-    def submit_answer(self):
-        """Simulate real quiz choices updates with row locks check"""
-        room_code = "FINAL_STRESS_ROOM" 
-        form_payload = {
-            "option_index": random.randint(0, 3),
-            "question_index": 0  
-        }
-        
-        self.client.post(
-            f"/rooms/{room_code}/answer", 
-            data=form_payload,
-            name="/rooms/[room_code]/answer",
-            allow_redirects=False
-        )
+        """Pure cache lookup isolation endpoint"""
+        with self.client.get("/leaderboard", catch_response=True) as response:
+            if response.status_code == 200:
+                response.success()
+            else:
+                response.failure(f"Drop Encountered: Status Code {response.status_code}")

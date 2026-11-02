@@ -65,6 +65,6 @@ if __name__ == "__main__":
         port=8001, 
         loop="asyncio",      
         reload=False,
-        backlog=4096,      # Double the size of the operating system connection listener queue
-        limit_concurrency=500 # Explicitly reject overloads gracefully before throwing OS errors
+        backlog=8192,             # OS buffer connection tracking capability double karein
+        limit_concurrency=10000   # 500 ki limit 1000 users par drop triggers raise karti hai, isay scale karein!
     )

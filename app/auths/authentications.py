@@ -92,7 +92,7 @@ async def login(request: Request,
             'error': 'Invalid Password.'
         })
 
-    access_token = createAccessToken({'sub': player.player_name})
+    access_token = createAccessToken({'sub': player.player_name,'user_id':player.id})
     refresh_token = getRefreshToken({'sub': player.player_name})
 
     response = RedirectResponse(url="/home", status_code=303)
@@ -123,9 +123,11 @@ async def login(request: Request,
     )
     db.add(new_refresh_token)
 
-        #### add ID:Name to REDIS HASHSET....
+    #### add ID:Name to REDIS HASHSET....
     redis = request.app.state.redis
     await redis.hset('user:name',str(player.id),player.player_name)
+    ### store user_id in request.state
+    request.state.user_id = player.id
 
     await db.commit()
 
