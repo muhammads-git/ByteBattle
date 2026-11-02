@@ -54,7 +54,7 @@ def getRefreshToken(data: dict, expires_at: timedelta | None = None):
 
     payload.update({'exp': expiry_time, 'type': 'refresh'})
 
-    encoded_refresh_token = jwt.encode(payload, SECRET_KEY, algorithm=[ALGORITHM])
+    encoded_refresh_token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_refresh_token
 
 

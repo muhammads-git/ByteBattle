@@ -7,23 +7,19 @@ from fastapi.responses import RedirectResponse
 from pydantic import HttpUrl
 from sqlalchemy.exc import IntegrityError
 
-from sqlalchemy.ext.asyncio import AsyncSession  # asyncsessions for asynchronous handling event loop
+from sqlalchemy.ext.asyncio import AsyncSession  
 from sqlalchemy import func, select
 
 from app.auths.jwt import get_current_user
-from app.database import get_db          # Assumes this now yields an AsyncSession
+from app.database import get_db          
 from app.engine import calculateScore
 from app.models import Player, Question, Room, RoomPlayer
 from app.templates_configs import templates
 
-# 15 seconds to each question answer time_
 QUESTION_SECONDS = 15
 
-# Router-level dependency manages the user context execution sequence safely
 room_router = APIRouter(dependencies=[Depends(get_current_user)])
 
-
-#  ASYNC HELPER FUNCTIONS (Non-blocking coroutines)
 
 def generate_unique_room_code(length=6):
     chars_digits = string.ascii_uppercase + string.digits
@@ -31,7 +27,6 @@ def generate_unique_room_code(length=6):
 
 
 async def get_room_or_404(db: AsyncSession, room_code: str) -> Room:
-    # Expression execution strategy replaces old sequential db.query chains
     stmt = select(Room).filter(Room.room_code == room_code)
     result = await db.execute(stmt)
     room = result.scalars().first()
@@ -55,18 +50,10 @@ async def require_member(db: AsyncSession, room: Room, user) -> RoomPlayer:
     return member
 
 
-async def get_player_id(db: AsyncSession, username):
-    stmt = select(Player).filter(Player.player_name == username)
-    result = await db.execute(stmt)
-    return result.scalars().first()
-
-
-# COROUTINE POST/GET ROUTES (Event loop never freezes on these)
-
 @room_router.post('/rooms')
 async def create_room(request: Request, db: AsyncSession = Depends(get_db), current_user=Depends(get_current_user)):
     count_stmt = select(func.count(Question.id))
-    question_count =await db.scalar(count_stmt)  # count_stmt is INTEGER so using await with int is wrong syntactically.
+    question_count = await db.scalar(count_stmt)  
     
     if question_count < 3:
         raise HTTPException(status_code=400, detail="Not enough questions in the database to seed a match.")
@@ -81,16 +68,17 @@ async def create_room(request: Request, db: AsyncSession = Depends(get_db), curr
         raise HTTPException(status_code=400, detail="Could not pick 3 questions.")
 
     code = generate_unique_room_code()
-    player = await get_player_id(db, username=current_user)
+    
+    user_id = current_user.get("user_id") if current_user else None
 
     while True:
         try:
-            new_room = Room(room_code=code, host_id=player.id, room_quizes=list_quest)
+            new_room = Room(room_code=code, host_id=user_id, room_quizes=list_quest)
             db.add(new_room)
-            await db.flush()  # Non-blocking context sync captures memory key ID
+            await db.flush()  
             
-            db.add(RoomPlayer(room_id=new_room.id, player_id=player.id))
-            await db.commit() # Database save released instantly!
+            db.add(RoomPlayer(room_id=new_room.id, player_id=user_id))
+            await db.commit() 
             break
         except IntegrityError as e:
             await db.rollback()
@@ -107,10 +95,7 @@ async def create_room(request: Request, db: AsyncSession = Depends(get_db), curr
 async def join_room(room_code: str = Form(...), db: AsyncSession = Depends(get_db), current_user=Depends(get_current_user)):
     room = await get_room_or_404(db, room_code)
     
-    user_stmt = select(Player).filter(Player.player_name == current_user)
-    user_result = await db.execute(user_stmt)
-    user = user_result.scalars().first()
-    user_id = user.id
+    user_id = current_user.get("user_id") if current_user else None
     
     if await get_membership(db, room, user_id):
         return RedirectResponse(url=f"/rooms/{room_code}", status_code=303)
@@ -136,9 +121,11 @@ async def view_lobby(
     current_user=Depends(get_current_user),
 ):
     room = await get_room_or_404(db, room_code)
-    player = await get_player_id(db, username=current_user)
+    
+    user_id = current_user.get("user_id") if current_user else None
+    username_str = current_user.get("sub") if current_user else None
 
-    membership = await get_membership(db, room, player.id)
+    membership = await get_membership(db, room, user_id)
 
     if not membership:
         if room.room_state == 'in_progress':
@@ -148,9 +135,9 @@ async def view_lobby(
         if room.expires_at < datetime.now(timezone.utc):
             raise HTTPException(status_code=400, detail="This room link has expired.")
 
-        db.add(RoomPlayer(player_id=player.id, room_id=room.id))
+        db.add(RoomPlayer(player_id=user_id, room_id=room.id))
         await db.commit()
-        print(f"Player {player.player_name} successfully auto-enrolled via shared link.")
+        print(f"Player {username_str} successfully auto-enrolled via shared link.")
 
     rows_stmt = (
         select(Player.player_name, Player.id)
@@ -161,7 +148,7 @@ async def view_lobby(
     rows = rows_result.all()
 
     players = [{"name": name, "is_host": pid == room.host_id} for name, pid in rows]
-    is_member = any(pid == player.id for _, pid in rows)
+    is_member = any(pid == user_id for _, pid in rows)
 
     if is_member and room.room_state == 'in_progress':
         return RedirectResponse(url=f"/rooms/{room_code}/play", status_code=303)
@@ -172,7 +159,7 @@ async def view_lobby(
         "request": request,
         "room_code": room.room_code,
         "players": players,
-        "is_host": room.host_id == player.id,
+        "is_host": room.host_id == user_id,
         "is_member": is_member,
     })
 
@@ -180,9 +167,10 @@ async def view_lobby(
 @room_router.post('/rooms/{room_code}/start')
 async def start_room(room_code: str, db: AsyncSession = Depends(get_db), current_user=Depends(get_current_user)):
     room = await get_room_or_404(db, room_code)
-    player = await get_player_id(db, current_user)
     
-    if room.host_id != player.id:
+    user_id = current_user.get("user_id") if current_user else None
+    
+    if room.host_id != user_id:
         raise HTTPException(status_code=403, detail="Only the host can start the game.")
     if room.room_state == 'in_progress':
         raise HTTPException(status_code=400, detail="Room already started.")
@@ -207,9 +195,9 @@ async def play_arena(
     current_user=Depends(get_current_user),
 ):
     
-    player = await get_player_id(db, current_user)
+    user_id = current_user.get("user_id") if current_user else None
     room = await get_room_or_404(db, room_code)
-    member = await require_member(db, room, player.id)
+    member = await require_member(db, room, user_id)
 
     if room.room_state == 'waiting':
         return RedirectResponse(url=f"/rooms/{room_code}", status_code=303)
@@ -251,7 +239,6 @@ async def play_arena(
         'already_answered': member.last_answered_index == room.current_question_index,
     })
 
-
 @room_router.post('/rooms/{room_code}/answer')
 async def submit_answer(
     request:Request,
@@ -261,7 +248,9 @@ async def submit_answer(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    player_info = await get_player_id(db, current_user)
+    player_id = current_user.get("user_id") if current_user else None
+    player_name = current_user.get("sub") if current_user else None
+    
     room = await get_room_or_404(db, room_code)
     if room.room_state != 'in_progress':
         raise HTTPException(status_code=400, detail="Room is not in progress.")
@@ -271,12 +260,9 @@ async def submit_answer(
     if question_index != room.current_question_index:
         return RedirectResponse(url=play_url, status_code=303)
     
-    # THE ROW LOCK REWRITE: 
-    # Standard .with_for_update() must now be wrapped inside an awaited select statement.
-    # While the DB holds this lock, the thread immediately yields control back to the event loop!
     lock_stmt = (
         select(RoomPlayer)
-        .filter(RoomPlayer.room_id == room.id, RoomPlayer.player_id == player_info.id)
+        .filter(RoomPlayer.room_id == room.id, RoomPlayer.player_id == player_id)
         .with_for_update()
     )
     lock_result = await db.execute(lock_stmt)
@@ -300,28 +286,15 @@ async def submit_answer(
     room_player.score += calculateScore(time_taken, is_correct)
     room_player.last_answered_index = room.current_question_index
     
-    # Extract the values into local variables BEFORE committing
-    player_id = player_info.id
-    player_name = player_info.player_name
-    print("name",player_name)
+    print("name", player_name)
     current_score = room_player.score
     
-    # Non-blocking async commit context synchronization
     await db.commit()
 
-    ############## REDIS ZADD ########################
-    # redis key
     global_leaderboard_key = 'global:leaderboard'
-
-    # member key 
-    member_key = f'{player_id}:{player_name}'
-
-    # get redis client
     redis = request.app.state.redis
-    # create/update zincrby -> just increment to existing ID's
-    await redis.zincrby(global_leaderboard_key,current_score,str(player_id))
+    await redis.zincrby(global_leaderboard_key, current_score, str(player_id))
 
-    # redirect
     return RedirectResponse(url=play_url, status_code=303)
 
 @room_router.get('/rooms/{room_code}/scores')
@@ -331,18 +304,13 @@ async def room_scores(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):  
-    #
-    stmt_p = select(Player).filter(Player.player_name == current_user)
-    res_p = await db.execute(stmt_p)
-    player = res_p.scalars().first()
+    user_id = current_user.get("user_id") if current_user else None
     
-    # Ensure player exists before checking properties
-    if not player:
-        # Handle unregistered user context appropriately
+    if not user_id:
         return RedirectResponse(url="/login", status_code=303)
     
     room = await get_room_or_404(db, room_code)
-    await require_member(db, room, player.id)
+    await require_member(db, room, user_id)
 
     if room.room_state != 'ended':
         return RedirectResponse(url=f"/rooms/{room_code}/play", status_code=303)
@@ -357,7 +325,7 @@ async def room_scores(
     rows = rows_result.all()
 
     players = [
-        {"name": name, "score": rp.score, "is_you": rp.player_id == player.id}
+        {"name": name, "score": rp.score, "is_you": rp.player_id == user_id}
         for rp, name in rows
     ]
 
@@ -392,36 +360,20 @@ async def get_time_left(room_code: str, db: AsyncSession = Depends(get_db), curr
 
 @room_router.get('/leaderboard')
 async def leaderboard(request: Request, db: AsyncSession = Depends(get_db), current_user=Depends(get_current_user)):
-    # 1. OPTIMIZATION: Extracting fields directly from JWT state to stop hitting PostgreSQL
-    # Agar request.state ya context mein user information maujood hai, toh wahan se fetch karein
-    user_id = getattr(request.state, 'user_id', None)
-    
-    # Static check implementation to bypass bottleneck under heavy Locust reads
-    if not user_id and current_user:
-        try:
-            # Agar system load testing par na ho tabhi DB query run karein
-            user_stmt = select(Player).filter(Player.player_name == current_user)
-            user_result = await db.execute(user_stmt)
-            user = user_result.scalars().first()
-            user_id = user.id if user else None
-        except Exception:
-            user_id = None # Silent fallback to keep routing loop alive
+    user_id = current_user.get("user_id") if current_user else None
 
     ## REDIS REVRANGE
     redis_key = 'global:leaderboard'
     redis = request.app.state.redis
     
-    # top 10
     raw_leaderboard = await redis.zrevrange(redis_key, 0, 9, withscores=True)
     
     player_id_list = [str(pid) for pid, score in raw_leaderboard]
     
-    # fetch the name of the player_id from REDIS HASHSET 
     player_name = await redis.hmget('user:name', player_id_list)
 
     rows = []
     for i, (pid, score) in enumerate(raw_leaderboard):
-        # Fallback handling to completely eliminate 500 parsing errors if an index map returns None
         resolved_player_name = player_name[i] if (i < len(player_name) and player_name[i]) else f"Player_{pid}"
         
         rows.append({
